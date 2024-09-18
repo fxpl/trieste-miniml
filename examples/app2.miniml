@@ -1,0 +1,9 @@
+let id = fun f x is x ;;
+
+let idid = id id ;;
+
+let ff = fun f x is 
+            fun g y is 
+                fun h z is 
+                    g h (x + 10) ;;
+

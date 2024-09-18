@@ -1,0 +1,1 @@
+let f = fun f (x : int -> int) is x 0;;

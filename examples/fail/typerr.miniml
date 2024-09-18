@@ -1,0 +1,9 @@
+let x = 0 ;;
+
+let isEq = fun f x is 
+               fun g y is 
+                 if x = y then true else false ;; 
+
+let err = isEq 0 true ;;
+ 
+

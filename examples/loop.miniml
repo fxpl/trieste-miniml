@@ -1,0 +1,6 @@
+let loop = fun f x is f x ;;
+
+loop 0 ;; 
+
+(* app :: forall c d. (c -> d) -> d  *)
+let app = fun f x is fun g y is f g;;   

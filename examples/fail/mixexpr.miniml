@@ -1,0 +1,3 @@
+if 0 < true then 0 else false;;
+
+fun g y is y < (fun f x is x);; 

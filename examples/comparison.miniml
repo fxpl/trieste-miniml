@@ -1,0 +1,9 @@
+0 < 1;;
+
+if (5 + 3 < 44) then true else false;;
+
+fun t x is if 3 < x = true then x < 3 else false;; (* ok *)
+
+(* fun f x is if true = 3 < x then x < 3 else false;; not ok *) 
+
+let f = fun g x is x;;

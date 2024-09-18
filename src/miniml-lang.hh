@@ -1,0 +1,82 @@
+#pragma once
+#include <trieste/trieste.h>
+
+namespace miniml
+{
+  using namespace trieste;
+
+  // Program
+  inline const auto Program = TokenDef("program", flag::symtab | flag::defbeforeuse);
+  // Declarations 
+  inline const auto Let = TokenDef("let", flag::lookup); 
+  
+  // --- Types --- 
+  inline const auto Type = TokenDef("type");
+  inline const auto TNone = TokenDef("none");
+  inline const auto TInt = TokenDef("t_int");
+  inline const auto TBool = TokenDef("t_bool");
+  inline const auto TVar = TokenDef("t_var", flag::print);
+  inline const auto TypeArrow = TokenDef("->");
+  // Constructed types 
+  inline const auto TVars = TokenDef("t_vars");
+  inline const auto ForAllTy = TokenDef("forall");
+  //Constraints 
+  inline const auto EqConstr = TokenDef("eq_constraint", flag::lookup);
+  inline const auto InstConstr = TokenDef("inst_constraint", flag::lookup);
+  inline const auto GenConstr = TokenDef("gen_constraint", flag::lookup);
+  inline const auto Constraints = TokenDef("constraints");
+  //Type Error 
+  inline const auto TypError = TokenDef("typeerror"); 
+
+  // --- Expressions --- 
+
+  // Constants 
+  inline const auto Int = TokenDef("int", flag::print);
+  inline const auto True = TokenDef("true");
+  inline const auto False = TokenDef("false");
+
+   // Arithmetic operators
+
+  inline const auto Add = TokenDef("+");
+  inline const auto Sub = TokenDef("-");
+  inline const auto Mul = TokenDef("*");
+
+  // Comparison expressions
+  inline const auto LT = TokenDef("<");
+  inline const auto Equals = TokenDef("=");  
+
+  // Functions 
+  inline const auto Fun  = TokenDef("fun", flag::symtab); //binds its argument to its symtab
+  inline const auto FunDef = TokenDef("fundef", flag::lookup | flag::shadowing); 
+  inline const auto Param = TokenDef("param", flag::lookup | flag::shadowing); 
+  inline const auto Annotation = TokenDef("t_annotation");
+  inline const auto Is  = TokenDef("is");
+
+  // Constants 
+  inline const auto If = TokenDef("if");
+  inline const auto Then = TokenDef("then");
+  inline const auto Else = TokenDef("else"); 
+  
+  // Identifiers 
+  inline const auto Ident = TokenDef("ident", flag::print); 
+
+  // Grouping tokens 
+  inline const auto TopExpr = TokenDef("topexpr"); // expressions/let decl at top level
+  inline const auto Expr = TokenDef("expr");
+  inline const auto App = TokenDef("app"); // function application 
+  
+  // Separators 
+  inline const auto Colon = TokenDef(":");
+  inline const auto Term = TokenDef(";;");
+  inline const auto Paren = TokenDef("()");
+
+  // Convenience tokens 
+  inline const auto Name = TokenDef("name", flag::print); 
+  inline const auto Op = TokenDef("op");
+  inline const auto Lhs = TokenDef("lhs");
+  inline const auto Rhs = TokenDef("rhs");
+  inline const auto Ty1 = TokenDef("ty1");
+  inline const auto Ty2 = TokenDef("ty2"); 
+
+
+}

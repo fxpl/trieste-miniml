@@ -1,0 +1,8 @@
+let app = fun f x is fun g y is y x;;   
+app (fun f x is x + 1) 42;;
+
+1 + (2+3) * 4 - 6;;
+
+1 * (fun f x is x) 4;;
+
+1;;

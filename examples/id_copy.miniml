@@ -1,0 +1,6 @@
+let id =
+  fun f n is n ;; 
+
+let idcopy = id;; 
+
+idcopy 4;;

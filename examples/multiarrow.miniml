@@ -1,0 +1,4 @@
+let isEq = fun f (x:int) is 
+            fun g (y:int) is
+             fun h (z:int) is  
+                 if x = y then y = z else false ;;

@@ -1,0 +1,9 @@
+let id = fun f x is x;;    
+
+let idtrue = id true ;;
+
+let id0 = id 0 ;; 
+
+let idfalse = id false ;;
+
+(*id 1 ;; *)

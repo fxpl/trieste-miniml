@@ -1,1 +1,1 @@
-let f = if 1 < 0 then true ;;
+let f = if 1 < 0 then true ;; (* missing else *)

@@ -1,0 +1,3 @@
+let apply = fun app f is fun appf x is f x;;
+
+apply (fun f x is x + 1) 42;;

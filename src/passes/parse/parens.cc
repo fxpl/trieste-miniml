@@ -15,7 +15,7 @@ using namespace trieste;
       parse::wf_parens,
       dir::topdown,
       {
-      T(Paren) << (T(Group)[Group] << (exprs * exprs++)) >> 
+      T(Paren) << T(Group)[Group] >> 
       [](Match& _) { 
           return Expr << *_[Group];
       },

@@ -6,4 +6,4 @@ let id0 = id 0 ;;
 
 let idfalse = id false ;;
 
-(*id 1 ;; *)
+id 1 ;; 

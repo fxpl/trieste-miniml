@@ -7,8 +7,8 @@ fact 4;;
 
 (* typed fact *)
 
-let fact =
+let fact' =
   fun f (n:int) : int is
     if n = 0 then 1 else n * f (n-1) ;; 
 
-fact 4;; 
+fact' 4;; 

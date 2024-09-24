@@ -4,7 +4,7 @@
 namespace miniml
 {
   using namespace ::trieste;
-  using Subst = std::map<std::string, std::pair<Node, std::string>>;
+  using Subst = std::map<std::string, Node>;
 
   //a few helper patterns
   inline const auto expr_binOp = T(Mul,Add,Sub,Equals,LT);
@@ -55,11 +55,11 @@ namespace miniml
 
   bool in_type(std::string var, Node ty);
 
-  void update_substmap(std::shared_ptr<Subst> subst, Node tyvar, Node subst_ty, std::string payload);
+  void update_substmap(std::shared_ptr<Subst> subst, Node tyvar, Node subst_ty);
 
   bool apply_subst(std::shared_ptr<Subst> subst, Node ty);
 
-  bool subst_type(Node ty, std::shared_ptr<Subst>);
+  void subst_type(Node ty, std::shared_ptr<Subst>);
 
   Node generalize(Node ty1);
 

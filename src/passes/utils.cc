@@ -2,16 +2,16 @@
 
 namespace miniml {
   using namespace trieste;
-  using Subst = std::map<std::string,std::pair<Node,std::string>>;
+  using Subst = std::map<std::string, Node>;
 
 int counter = 0;
 
-auto err(const NodeRange& r, const std::string& msg)
+Node err(const NodeRange& r, const std::string& msg)
 {
     return Error << (ErrorMsg ^ msg) << (ErrorAst << r);
 }
 
-auto err(Node node, const std::string& msg)
+Node err(Node node, const std::string& msg)
 {
     return Error << (ErrorMsg ^ msg) << (ErrorAst << node);
 }
@@ -173,7 +173,7 @@ void subst_type(Node ty, std::shared_ptr<Subst> subst_map, std::vector<std::stri
   if (ty->type() == TVar) {
     auto name = node_val(ty);
     if (subst_map->find(name) != subst_map->end()) {
-      ty->parent()->replace(ty, (*subst_map)[name].first);
+      ty->parent()->replace(ty, (*subst_map)[name]);
     }
   } else if (ty->type() == TypeArrow) {
       for (auto& child : *ty) {
@@ -194,18 +194,17 @@ void subst_type(Node ty, std::shared_ptr<Subst> subst_map) {
   subst_type(ty, subst_map, bound);
 }
 
-void update_substmap(std::shared_ptr<Subst> subst, Node tyvar, Node subst_ty, std::string payload){
+void update_substmap(std::shared_ptr<Subst> subst, Node tyvar, Node subst_ty) {
   auto var = node_val(tyvar);
-  (*subst)[var] = std::make_pair(subst_ty,payload); //add substitution
-  for (auto [v,val] : *subst){
-    auto [t,p] = val;
-    if (t->type() != TypeArrow){
-      if (var == node_val(t)){
-        (*subst)[v] = std::make_pair(subst_ty,p);
+  (*subst)[var] = subst_ty; //add substitution
+  for (auto [v,t] : *subst) {
+    if (t->type() != TypeArrow) {
+      if (var == node_val(t)) {
+        (*subst)[v] = subst_ty;
       }
     } else {
       subst_arrow(true, t, var, subst_ty->clone());
-      (*subst)[v] = std::make_pair(t, p);
+      (*subst)[v] = t;
     }
   }
 }

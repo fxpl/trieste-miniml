@@ -43,12 +43,10 @@ namespace miniml
         T(SubstEqConstr)[EqConstr] << ((T(TVar)[TVar] * type[Type]) /
                                        (type[Type] * T(TVar)[TVar])) >>
           [local_subst](Match& _) {
-            // TODO: source_str is not needed in substmap anymore!
-            auto source_str = node_val(_(EqConstr));
             if(in_type(node_val(_(TVar)), _(Type))) {
                 return (TypError ^ _(EqConstr)) << _(TVar) << _(Type);
             }
-            update_substmap(local_subst, _(TVar), _(Type), source_str);
+            update_substmap(local_subst, _(TVar), _(Type));
             return nothing;
           },
 
@@ -60,28 +58,24 @@ namespace miniml
               return nothing;
           },
 
-        // TODO: Ty1 can only be a type variable
-        T(SubstInstConstr)[InstConstr] << (type[Ty1] * T(TVar)[TVar])  >>
+        T(SubstInstConstr)[InstConstr] << (T(TVar)[Ty1] * T(TVar)[TVar])  >>
         [local_subst, global_subst](Match& _){
             auto res = global_subst->find(node_val(_(TVar)));
             if (res != global_subst->end()){
-              auto typ = instantiate(res->second.first);
-              update_substmap(local_subst, _(Ty1), typ, node_val(_(InstConstr)));
+              auto typ = instantiate(res->second);
+              update_substmap(local_subst, _(Ty1), typ);
               return Reapply << ((SubstEqConstr ^ _(InstConstr)) << _(Ty1) << typ); //return updated constraint to view next
             }
             // TODO: This will be dropped?
-            else {
-              return err(_(TVar), "internal error, could not find type");
-            }
+            return err(_(TVar), "Internal error: Could not find type to instantiate");
         },
 
-        // TODO: Ty1 is a type variable
-        T(SubstGenConstr)[GenConstr] << (type[Ty1] * type[Ty2]) >>
+        T(SubstGenConstr)[GenConstr] << (T(TVar)[Ty1] * type[Ty2]) >>
         [local_subst, global_subst](Match& _){
             auto typ = generalize(_(Ty2));
             // add to global substitution
-            (*global_subst)[node_val(_(Ty1))] = std::make_pair(typ, node_val(_(GenConstr)));
-            update_substmap(local_subst, _(Ty1), typ, node_val(_(GenConstr)));  // update local subst
+            (*global_subst)[node_val(_(Ty1))] = typ;
+            update_substmap(local_subst, _(Ty1), typ);  // update local subst
             return nothing;
         },
 
@@ -90,18 +84,15 @@ namespace miniml
           [local_subst](Match& _) -> Node {
             auto res = local_subst->find(node_val(_(TVar)));
             if (res != local_subst->end()){
-              return (res->second.first)->clone();
+              return (res->second)->clone();
             }
-            // TODO: We probably want to report an error if we don't have a substitution here
-            return NoChange; // no substitution found (yet)
+            // TODO: This is dropped?
+            return err(_(TVar), "Internal error: no substitution found for type variable");
         },
 
-        // error
-        // TODO: Can this happen? In fuzzing?
-        In(TypeArrow) * T(ForAllTy)[ForAllTy] >>
-          [](Match& _){
-          return err(_(ForAllTy), "internal error, invalid type substitution");
-        }
+        // errors
+        T(SubstGenConstr, SubstInstConstr)[Constr] >>
+          [](Match& _) { return err(_(Constr), "Internal error: malformed constraint"); },
     }
   };
   tc.pre(TopExpr, [local_subst](Node ){

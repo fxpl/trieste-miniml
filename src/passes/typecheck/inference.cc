@@ -1,7 +1,7 @@
 #include "../internal.hh"
 #include "../utils.hh"
 
-//Infer types and constraints 
+//Infer types and constraints
 
 namespace miniml
 {
@@ -141,10 +141,10 @@ namespace miniml
                   auto r_typ = _(Rhs) / Type;
                   auto op_eqconstraint = eq_constraint(l_typ, r_typ, _(Expr));
                   auto expr = (Expr << (Type << optyp) << _(Op));
-                  return (_(Op)->type() == Equals) 
+                  return (_(Op)->type() == Equals)
                     ? Seq << (lift_constraint(op_eqconstraint)) << expr
                     : Seq << (lift_constraints({op_eqconstraint, eq_constraint(r_typ, int_type(), _(Expr))}))
-                          << expr;  
+                          << expr;
                 },
             // FUNDEF
             T(Expr) << (T(Fun)[Fun]
@@ -179,7 +179,7 @@ namespace miniml
                                << expr;
                   }
                   else if (lhs_typ->type() == TVar)
-                  { 
+                  {
                     auto fun_typ = arrow_type(rhs_typ, ret_typ);
                     auto fun_constraint = eq_constraint(lhs_typ, fun_typ, _(App));
                     return Seq << lift_constraint(fun_constraint)
@@ -219,6 +219,9 @@ namespace miniml
          {
            auto let_typ = get_type(_(Let));
            auto rhs_typ = get_type(_(Let) / Expr);
+           if (let_typ->type() != TVar) {
+             return err(_(Let), "Internal error: let binding has non-variable type");
+           }
            auto constr = gen_constraint(let_typ, rhs_typ, _(Let));
            return Seq << (_(Constraints) << constr)
                       << _(Let);

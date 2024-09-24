@@ -84,10 +84,10 @@ namespace miniml
           [local_subst](Match& _) -> Node {
             auto res = local_subst->find(node_val(_(TVar)));
             if (res != local_subst->end()){
-              return (res->second)->clone();
+              return res->second->clone();
             }
-            // TODO: This is dropped?
-            return err(_(TVar), "Internal error: no substitution found for type variable");
+            // TODO: Should check if this is an unbound variable and report an internal error
+            return NoChange;
         },
 
         // errors
@@ -103,7 +103,6 @@ namespace miniml
   // TODO: Pass that replaces TopExpr by its Expr (wf is wf). Replace TypError above with regular Errors
 
   // clean-up after pass
-  // TODO: See if this can be done as a post instead
   tc.post([](Node n){
       auto program = n->front();
       for(auto ts = program->begin(); ts != program->end(); ts++){

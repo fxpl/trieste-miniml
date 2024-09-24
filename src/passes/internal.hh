@@ -142,7 +142,7 @@ namespace miniml{
 
     inline const auto wf_inf_exprs = wf_fresh
     | (Constraints <<= (EqConstr | InstConstr | GenConstr)++)
-    | (GenConstr <<= (Ty1 >>= wf_types) * (Ty2 >>= wf_types)) //Ty is a generalization of Ty2
+    | (GenConstr <<= (Ty1 >>= TVar) * (Ty2 >>= wf_types)) // Ty1 is a generalization of Ty2
     | (InstConstr <<= (Ty1 >>= TVar) * (Ty2 >>= TVar)) // Ty1 is an instance of Ty2
     | (Expr <<= Type * (Expr >>= wf_expr));
 

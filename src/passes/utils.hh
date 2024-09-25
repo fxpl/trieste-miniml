@@ -57,8 +57,6 @@ namespace miniml
 
   void update_substmap(std::shared_ptr<Subst> subst, Node tyvar, Node subst_ty);
 
-  bool apply_subst(std::shared_ptr<Subst> subst, Node ty);
-
   void subst_type(Node ty, std::shared_ptr<Subst>);
 
   Node generalize(Node ty1);

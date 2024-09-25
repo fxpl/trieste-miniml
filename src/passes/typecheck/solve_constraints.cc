@@ -35,8 +35,8 @@ namespace miniml
             ((T(TypeArrow) << (type[Ty11] * type[Ty12])) *
              (T(TypeArrow) << (type[Ty21] * type[Ty22]))) >>
           [](Match& _) {
-              auto c1 = (SubstEqConstr ^ _(EqConstr)) << _(Ty11) << _(Ty21);
-              auto c2 = (SubstEqConstr ^ _(EqConstr)) << _(Ty21) << _(Ty22);
+              auto c1 = (EqConstr ^ _(EqConstr)) << _(Ty11) << _(Ty21);
+              auto c2 = (EqConstr ^ _(EqConstr)) << _(Ty12) << _(Ty22);
               return Reapply << c1 << c2;
           },
 

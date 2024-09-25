@@ -24,7 +24,7 @@ std::string node_val(Node node){
 std::string ty_err_msg(Node c){
   std::string msg;
   if ((c)->type() == TypError){
-    auto src_exp = node_val(c); //Type error should have exactly 2 children
+    auto src_exp = node_val(c); // Type error should have exactly 2 children
     auto t1 = ((c)->front())->str();
     auto t2 = ((c)->back())->str();
     msg = "Cannot match type " + t1 + " with type" + t2 + " in expression " + src_exp;
@@ -154,30 +154,16 @@ bool in_type(std::string var, Node ty){
   return false;
 }
 
-
-bool subst_arrow(bool upd, Node arrow_ty, std::string var, Node subst_ty){
-  for (auto it=arrow_ty->begin(); it != arrow_ty->end(); it++){
-      if((*it)->type() != TypeArrow){
-        if(var == node_val(*it)){ //the tyvar we want to replace
-          arrow_ty->replace(*it,subst_ty); //apply substitution
-          upd = true;
-        }
-      } else { //if nested arrow type, recurse
-          upd = subst_arrow(upd, *it,var,subst_ty);
-      }
-  }
-  return upd;
-}
-
-void subst_type(Node ty, std::shared_ptr<Subst> subst_map, std::vector<std::string>& bound) {
+void subst_type(Node ty, std::shared_ptr<Subst> subst, std::vector<std::string>& bound) {
   if (ty->type() == TVar) {
-    auto name = node_val(ty);
-    if (subst_map->find(name) != subst_map->end()) {
-      ty->parent()->replace(ty, (*subst_map)[name]);
-    }
+      auto name = node_val(ty);
+      // TODO: Check bound names!
+      if (subst->find(name) != subst->end()) {
+          ty->parent()->replace(ty, (*subst)[name]->clone());
+      }
   } else if (ty->type() == TypeArrow) {
       for (auto& child : *ty) {
-          subst_type(child, subst_map, bound);
+          subst_type(child, subst, bound);
       }
   } else if (ty->type() == ForAllTy) {
       auto params = ty/TVars;
@@ -185,39 +171,31 @@ void subst_type(Node ty, std::shared_ptr<Subst> subst_map, std::vector<std::stri
         auto param_name = node_val(param);
         bound.push_back(param_name);
       }
-      subst_type(ty/Type, subst_map, bound);
+      subst_type(ty/Type, subst, bound);
+      for (auto param : *params) {
+        bound.pop_back();
+      }
   }
 }
 
-void subst_type(Node ty, std::shared_ptr<Subst> subst_map) {
+void subst_type(Node ty, std::shared_ptr<Subst> subst) {
   std::vector<std::string> bound;
-  subst_type(ty, subst_map, bound);
+  subst_type(ty, subst, bound);
 }
 
 void update_substmap(std::shared_ptr<Subst> subst, Node tyvar, Node subst_ty) {
   auto var = node_val(tyvar);
-  (*subst)[var] = subst_ty; //add substitution
+  (*subst)[var] = subst_ty->clone(); // add substitution
   for (auto [v,t] : *subst) {
-    if (t->type() != TypeArrow) {
+    if (t->type() == TVar) {
       if (var == node_val(t)) {
-        (*subst)[v] = subst_ty;
+          (*subst)[v] = subst_ty->clone();
       }
     } else {
-      subst_arrow(true, t, var, subst_ty->clone());
-      (*subst)[v] = t;
+      subst_type(t, subst);
     }
   }
 }
-
-bool apply_subst(std::shared_ptr<Subst> subst, Node constraint) {
-    auto t1 = constraint/Ty1;
-    auto t2 = constraint/Ty2;
-    bool updated = false;
-    subst_type(t1, subst);
-    subst_type(t2, subst);
-    return updated;
-}
-
 
 void generalize_(Node ty, Node tvars){
   for (auto it = ty->begin();

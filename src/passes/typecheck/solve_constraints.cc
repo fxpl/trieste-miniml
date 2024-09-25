@@ -44,7 +44,8 @@ namespace miniml
                                        (type[Type] * T(TVar)[TVar])) >>
           [local_subst](Match& _) {
             if(in_type(node_val(_(TVar)), _(Type))) {
-                return (TypError ^ _(EqConstr)) << _(TVar) << _(Type);
+              // TODO: More information in type error
+                return err(_(EqConstr), "Cannot construct infinite type");
             }
             update_substmap(local_subst, _(TVar), _(Type));
             return nothing;
@@ -53,7 +54,8 @@ namespace miniml
         T(SubstEqConstr)[EqConstr] << (type[Ty1] * type[Ty2]) >>
           [](Match& _) {
               if (_(Ty1)->type() != _(Ty2)->type()) {
-                return (TypError ^ _(EqConstr)) << _(Ty1) << _(Ty2);
+                // TODO: More information in type error
+                return err(_(EqConstr), "Cannot match types");
               }
               return nothing;
           },
@@ -66,7 +68,6 @@ namespace miniml
               update_substmap(local_subst, _(Ty1), typ);
               return Reapply << ((SubstEqConstr ^ _(InstConstr)) << _(Ty1) << typ); //return updated constraint to view next
             }
-            // TODO: This will be dropped?
             return err(_(TVar), "Internal error: Could not find type to instantiate");
         },
 
@@ -80,7 +81,7 @@ namespace miniml
         },
 
         // substitute types
-        In(Let,Expr,TypError)++ * (T(TVar)[TVar]) >>
+        In(Let,Expr)++ * (T(TVar)[TVar]) >>
           [local_subst](Match& _) -> Node {
             auto res = local_subst->find(node_val(_(TVar)));
             if (res != local_subst->end()){
@@ -100,23 +101,23 @@ namespace miniml
     return 0;
   });
 
-  // TODO: Pass that replaces TopExpr by its Expr (wf is wf). Replace TypError above with regular Errors
-
-  // clean-up after pass
-  tc.post([](Node n){
-      auto program = n->front();
-      for(auto ts = program->begin(); ts != program->end(); ts++){
-        auto cs = *ts/Constraints;
-        auto exp = *ts/Expr;
-        // propagate type errors
-        for(auto c = cs->begin(); c != cs->end(); c++){
-          auto msg = ty_err_msg(*c);
-          exp->push_front(Error << (ErrorMsg ^ msg) << *c);
-        }
-        program->replace(*ts,exp); //replace top exprs with exprs
-      }
-      return 0; });
-
   return tc;
+  }
+
+  PassDef cleanup_constraints()
+  {
+    return {
+        "cleanup_constraints",
+        check::wf_cleanup_constr,
+        dir::once | dir::bottomup,
+        {
+          T(TopExpr) <<
+            T(Constraints) * T(Let, Expr)[Expr] >>
+              [](Match& _) { return _(Expr); },
+
+          T(Constraints) << Any[Constr] >>
+            [](Match& _) { return err(_(Constr), "Internal error: unhandled constraint"); },
+        }
+    };
   }
 }

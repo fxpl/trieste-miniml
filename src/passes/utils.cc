@@ -133,32 +133,27 @@ Node gen_constraint(Node ty1, Node ty2, Node origin){
     return lift_constraint;
 }
 
-bool in(std::string var, NodeIt from, NodeIt end){
-  while(from != end){
-    if(node_val(*from) == var) return true;
-    from++;
+bool contains_var(std::string var, Node ty) {
+  for (auto child : *ty) {
+    if(child->type() == TVar && node_val(child) == var) return true;
   }
   return false;
 }
 
 bool in_type(std::string var, Node ty){
-  // TODO: For loop?
-  auto it = ty->begin();
-  while(it != ty->end()){
-    if(node_val(*it) == var) return true;
-    else if((*it)->type() == TypeArrow){
-      in_type(var,*it);
-    }
-    it++;
+  for (auto child : *ty) {
+      if (child->type() == TVar && node_val(child) == var) return true;
+      else if (child->type() == TypeArrow) {
+          in_type(var,child);
+      }
   }
   return false;
 }
 
-void subst_type(Node ty, std::shared_ptr<Subst> subst, std::vector<std::string>& bound) {
+void subst_type(Node ty, std::shared_ptr<Subst> subst, std::multiset<std::string>& bound) {
   if (ty->type() == TVar) {
       auto name = node_val(ty);
-      // TODO: Check bound names!
-      if (subst->find(name) != subst->end()) {
+      if (subst->find(name) != subst->end() && bound.find(name) == bound.end()) {
           ty->parent()->replace(ty, (*subst)[name]->clone());
       }
   } else if (ty->type() == TypeArrow) {
@@ -169,17 +164,18 @@ void subst_type(Node ty, std::shared_ptr<Subst> subst, std::vector<std::string>&
       auto params = ty/TVars;
       for (auto param : *params) {
         auto param_name = node_val(param);
-        bound.push_back(param_name);
+        bound.insert(param_name);
       }
       subst_type(ty/Type, subst, bound);
       for (auto param : *params) {
-        bound.pop_back();
+        auto param_name = node_val(param);
+        bound.erase(param_name);
       }
   }
 }
 
 void subst_type(Node ty, std::shared_ptr<Subst> subst) {
-  std::vector<std::string> bound;
+  std::multiset<std::string> bound;
   subst_type(ty, subst, bound);
 }
 
@@ -197,16 +193,14 @@ void update_substmap(std::shared_ptr<Subst> subst, Node tyvar, Node subst_ty) {
   }
 }
 
-void generalize_(Node ty, Node tvars){
-  for (auto it = ty->begin();
-            it != ty->end();
-            it++){
-    if((*it)->type() == TVar){
-      if (!in(node_val(*it), tvars->begin(), tvars->end())){
-        tvars << *it;
+void generalize_(Node ty, Node tvars) {
+  for (auto child : *ty) {
+    if(child->type() == TVar) {
+      if (!contains_var(node_val(child), tvars)) {
+        tvars << child->clone();
       }
-    } else if ((*it)->type() == TypeArrow){
-      generalize_(*it,tvars);
+    } else if (child->type() == TypeArrow) {
+      generalize_(child,tvars);
     }
   }
 }
@@ -217,27 +211,27 @@ Node generalize(Node ty1){
   return (ForAllTy ^ "forall") << ty_vars << (Type << ty1->clone());
 }
 
-Node instantiate_(std::map<std::string,Node> substmap, Node typ){
-for (auto it = typ->begin(); it != typ->end(); it++){
-      auto subst = substmap.find(node_val(*it));
-      if((*it)->type() == TypeArrow){
-        instantiate_(substmap, *it);
+Node instantiate_(Subst substmap, Node typ){
+  for (auto child : *typ){
+      auto subst = substmap.find(node_val(child));
+      if(child->type() == TypeArrow){
+        instantiate_(substmap, child);
       }
       else if(subst != substmap.end()){
-        typ->replace(*it, (subst->second)->clone());
+        typ->replace(child, (subst->second)->clone());
       }
     }
   return typ;
 }
 
-Node instantiate(Node ty){
-  if (ty->type() == ForAllTy){
-    auto substmap = std::map<std::string,Node>(); //local substmap
+Node instantiate(Node ty) {
+  if (ty->type() == ForAllTy) {
+    auto substmap = Subst(); //local substmap
     Node ftvars = ty/TVars;
     // initialize concrete type variables
-    for (auto it = ftvars->begin(); it != ftvars->end(); it++){
+    for (auto child : *ftvars) {
       auto freshtv = fresh_tvar();
-      substmap[node_val(*it)] = freshtv;
+      substmap[node_val(child)] = freshtv;
     }
     // substitute fresh variables in type
     Node typ = ty/Type/Type;

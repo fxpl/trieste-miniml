@@ -21,20 +21,6 @@ std::string node_val(Node node){
     return text;
 }
 
-std::string ty_err_msg(Node c){
-  std::string msg;
-  if ((c)->type() == TypError){
-    auto src_exp = node_val(c); // Type error should have exactly 2 children
-    auto t1 = ((c)->front())->str();
-    auto t2 = ((c)->back())->str();
-    msg = "Cannot match type " + t1 + " with type" + t2 + " in expression " + src_exp;
-  } else {
-    msg = "Internal error: Unexpected " + c->str();
-  }
-  return msg;
-}
-
-
 Node get_type(Node n){
   return n/Type/Type;
 }
@@ -88,7 +74,7 @@ Node get_base_type(Node node)
     }
   }
 
-  Node get_op_type(Node node)
+Node get_op_type(Node node)
   {
     trieste::Token typ = node->type();
     if (typ.in({Add,Mul,Sub})){
@@ -120,17 +106,18 @@ Node inst_constraint(Node ty1, Node ty2, Node origin){
 Node gen_constraint(Node ty1, Node ty2, Node origin){
   return create_constraint(GenConstr,ty1,ty2,node_val(origin));
 }
-  // for convinient lifting to top
-  Node lift_constraint(Node n){
-    return Lift << TopExpr << n;
-  }
 
-  Node lift_constraints(std::vector<Node> nodes){
-    Node lift_constraint = Lift << TopExpr;
-    for(Node n : nodes){
+// for convinient lifting to top
+Node lift_constraint(Node n){
+  return Lift << TopExpr << n;
+}
+
+Node lift_constraints(std::vector<Node> nodes){
+  Node lift_constraint = Lift << TopExpr;
+  for(Node n : nodes){
       lift_constraint << n;
-    }
-    return lift_constraint;
+  }
+  return lift_constraint;
 }
 
 bool contains_var(std::string var, Node ty) {
@@ -242,5 +229,3 @@ Node instantiate(Node ty) {
   }
 }
 }
-
-

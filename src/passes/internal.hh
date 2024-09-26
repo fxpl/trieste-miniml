@@ -144,32 +144,29 @@ namespace miniml{
     | (Constraints <<= (EqConstr | InstConstr | GenConstr)++)
     | (GenConstr <<= (Ty1 >>= TVar) * (Ty2 >>= wf_types)) // Ty1 is a generalization of Ty2
     | (InstConstr <<= (Ty1 >>= TVar) * (Ty2 >>= TVar)) // Ty1 is an instance of Ty2
-    | (Expr <<= Type * (Expr >>= wf_expr));
-
-    // Constraints empty
-    inline const auto wf_solve_constr =
-    wf_fresh
     | (Expr <<= Type * (Expr >>= wf_expr))
-    | (ForAllTy <<= TVars * Type)
-    | (TVars <<= TVar++)
-    | (Program <<= TopExpr++)
-    | (TopExpr <<= Constraints * (Expr >>= (Let | Expr)))
-    | (Type <<= (Type >>= wf_types | ForAllTy))
-    | (Let <<= Ident * Type * Expr) // remove binding to reduce clutter
-    | (Param <<= Ident * Type) // remove binding to reduce clutter                                                                                                                                                                                                                                                                                                      // remove binding to reduce clutter
-    | (FunDef <<= Ident * Type * Param * Expr) // remove binding to reduce clutter                                                                                                                                                                                                                                                                                     // remove binding to reduce clutter
     ;
 
-    // TODO: wf for pass that does cleanup
+    inline const auto wf_solve_constr =
+    wf_inf_exprs
+    | (Type <<= (Type >>= wf_types | ForAllTy))
+    | (ForAllTy <<= TVars * Type)
+    | (TVars <<= TVar++)
+    | (Constraints <<= trieste::wf::Fields({}, Invalid))
+    ;
 
     // Final Wf
-    // TODO: Finish, base on wf from parse namespace
-    inline const auto wf_cleanup_constr =
-    wf_solve_constr
-    | (Program <<= (Let | Expr)++)
+    inline const auto wf =
+    parse::wf
+    | (Type <<= (Type >>= wf_types | ForAllTy))
+    | (ForAllTy <<= TVars * Type)
+    | (TVars <<= TVar++)
+    | (Let <<= Ident * Type * Expr)
+    | (Expr <<= Type * (Expr >>= wf_expr))
+    | (Param <<= Ident * Type)
+    | (FunDef <<= Ident * Type * Param * Expr)
     ;
 
     }
-
 }
 

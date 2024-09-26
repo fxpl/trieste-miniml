@@ -16,9 +16,7 @@ namespace miniml
 
   Node err(Node node, const std::string &msg);
 
-  std::string ty_err_msg(Node n);
-
-  std::string node_val(Node node);
+    std::string node_val(Node node);
 
   Node get_type(Node n);
 
@@ -50,8 +48,6 @@ namespace miniml
   Node lift_constraint(Node n);
 
   Node lift_constraints(std::vector<Node> nodes);
-
-  bool in(std::string var, NodeIt from, NodeIt end);
 
   bool in_type(std::string var, Node ty);
 

@@ -44,7 +44,7 @@ namespace miniml
                                        (type[Type] * T(TVar)[TVar])) >>
           [local_subst](Match& _) {
             if(in_type(node_val(_(TVar)), _(Type))) {
-              // TODO: More information in type error
+                // TODO: More information in type error
                 return err(_(EqConstr), "Cannot construct infinite type");
             }
             update_substmap(local_subst, _(TVar), _(Type));
@@ -108,15 +108,11 @@ namespace miniml
   {
     return {
         "cleanup_constraints",
-        check::wf_cleanup_constr,
+        check::wf,
         dir::once | dir::bottomup,
         {
-          T(TopExpr) <<
-            T(Constraints) * T(Let, Expr)[Expr] >>
-              [](Match& _) { return _(Expr); },
-
-          T(Constraints) << Any[Constr] >>
-            [](Match& _) { return err(_(Constr), "Internal error: unhandled constraint"); },
+          T(Constraints) >>
+            [](Match&) { return nothing; },
         }
     };
   }

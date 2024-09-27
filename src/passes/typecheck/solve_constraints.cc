@@ -109,7 +109,7 @@ namespace miniml
     return {
         "cleanup_constraints",
         check::wf,
-        dir::once | dir::bottomup,
+        dir::topdown | dir::once,
         {
           T(Constraints) >>
             [](Match&) { return nothing; },

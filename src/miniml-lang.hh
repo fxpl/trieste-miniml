@@ -21,15 +21,13 @@ namespace miniml
   inline const auto TVars = TokenDef("t_vars");
   inline const auto ForAllTy = TokenDef("forall");
   //Constraints
-  inline const auto EqConstr = TokenDef("eq_constraint", flag::lookup);
-  inline const auto InstConstr = TokenDef("inst_constraint", flag::lookup);
-  inline const auto GenConstr = TokenDef("gen_constraint", flag::lookup);
+  inline const auto EqConstr = TokenDef("eq_constraint");
+  inline const auto InstConstr = TokenDef("inst_constraint");
+  inline const auto GenConstr = TokenDef("gen_constraint");
   inline const auto SubstEqConstr = TokenDef("subst_eq_constraint");
   inline const auto SubstInstConstr = TokenDef("subst_inst_constraint");
   inline const auto SubstGenConstr = TokenDef("subst_gen_constraint");
   inline const auto Constraints = TokenDef("constraints");
-  //Type Error
-  inline const auto TypError = TokenDef("typeerror");
 
   // --- Expressions ---
 

@@ -133,9 +133,9 @@ namespace miniml{
     inline const auto wf_fresh = parse::wf
     | (TopExpr <<= Constraints * (Expr >>= (Let | Expr)))
     | (Constraints <<= EqConstr++)
+    | (EqConstr <<= (Ty1 >>= wf_types) * (Ty2 >>= wf_types))
     | (Param <<= Ident * Type)[Ident] // bind fun arguments to symtab
     | (Let <<= Ident * Type * Expr)[Ident] // bind let variable to symtab
-    | (EqConstr <<= (Ty1 >>= wf_types) * (Ty2 >>= wf_types))
     | (Type <<= (Type >>= wf_types))
     | (FunDef <<= Ident * Type * Param * Expr)[Ident] // to access nested functions
     ;
@@ -148,11 +148,10 @@ namespace miniml{
     ;
 
     inline const auto wf_solve_constr =
-    wf_inf_exprs
+    (wf_inf_exprs - Constraints - EqConstr - GenConstr - InstConstr)
     | (Type <<= (Type >>= wf_types | ForAllTy))
     | (ForAllTy <<= TVars * Type)
     | (TVars <<= TVar++)
-    | (Constraints <<= trieste::wf::Fields({}, Invalid))
     ;
 
     // Final Wf

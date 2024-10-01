@@ -30,6 +30,7 @@ std::vector<Pass> passes(){
       inf_exprs(),
       let_constr(),
       solve_constraints(),
+      cleanup_constraints(),
       };
-    } 
+    }
 }

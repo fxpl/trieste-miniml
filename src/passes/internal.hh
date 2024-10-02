@@ -5,6 +5,7 @@ namespace miniml{
  using namespace trieste;
 
     std::vector<Pass> passes();
+    Parse parser();
 
     inline const auto wf_types = TInt | TBool | TVar | TypeArrow ;
     inline const auto wf_expr = Int | True | False
@@ -12,8 +13,6 @@ namespace miniml{
     | If | Ident | Fun | App ;
 
     namespace init_parse{
-
-    Parse parser();
 
     inline const auto wf_parse_tokens =
      Add | Sub | Mul |

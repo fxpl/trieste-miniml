@@ -1,3 +1,4 @@
+#include "parse/init_parse.cc"
 #include "parse/parse_cleanup.cc"
 #include "parse/fun.cc"
 #include "parse/parens.cc"
@@ -12,6 +13,10 @@
 #include "typecheck/solve_constraints.cc"
 
 namespace miniml{
+
+Parse parser(){
+  return init_parser();
+}
 
 std::vector<Pass> passes(){
     return {

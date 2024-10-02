@@ -1,14 +1,12 @@
 #include "../../miniml-lang.hh"
-#include "internal.hh"
-
+#include "../internal.hh"
 
 namespace miniml
 {
   using namespace trieste; 
   using namespace trieste::detail;
 
-  namespace init_parse {
-  Parse parser()
+  Parse init_parser()
   {
     Parse p(depth::file, init_parse::wf); 
     auto depth = std::make_shared<size_t>(0);
@@ -103,12 +101,8 @@ namespace miniml
       if(m.mode() == "comment"){
         m.error("Unterminated comment");
       }
-      m.term();
-      if(!m.in(Term)){
-        m.error("Missing ;; at end of statement");
-      } else m.pop(Term);
+      m.term({Term});
     });
     return p;
-  }
   }
 }

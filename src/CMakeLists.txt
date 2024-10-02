@@ -13,7 +13,6 @@ FetchContent_MakeAvailable(trieste)
 
 add_executable(miniml
 main.cc
-init_parse.cc
 passes/passes.cc
 passes/utils.cc
 )

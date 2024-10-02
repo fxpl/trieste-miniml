@@ -5,13 +5,14 @@
 namespace miniml {
 
 using namespace trieste;
+using namespace miniml;
   
 Reader reader()
   {
     return {
       "miniML",
-      miniml::passes(),
-      init_parse::parser(),
+      passes(),
+      parser(),
     };
   }
 

@@ -1,3 +1,5 @@
-let e = fun f x is x * 5 + 3;;
+let f = 5 + 5;;
 
-1 + (2+3) + 4;;
+let y = 4;;
+
+let x = fun g y is 1 + (y+3) * 4;;

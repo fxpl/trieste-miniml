@@ -81,7 +81,7 @@ namespace miniml
         },
 
         // substitute types
-        In(Let,Expr)++ * (T(TVar)[TVar]) >>
+        T(TVar)[TVar] >>
           [local_subst](Match& _) -> Node {
             auto res = local_subst->find(node_val(_(TVar)));
             if (res != local_subst->end()){

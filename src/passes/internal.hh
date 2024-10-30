@@ -20,14 +20,14 @@ namespace miniml{
      Int | True | False |
      If | Then | Else |
      Ident | Fun | Is | Let |
-     Colon | Paren | Term |
+     Colon | Paren |
      wf_types
      ;
 
     inline const wf::Wellformed wf =
       (Top <<= File)
     | (File <<= (Term | Group))
-    | (Paren <<= Group)
+    | (Paren <<= Group++)
     | (Term <<= (Group)++[1])
     | (Group <<= (wf_parse_tokens)++[1])
     ;
@@ -35,7 +35,7 @@ namespace miniml{
     }
     namespace parse{
 
-    inline const auto wf_parse_cleanup = init_parse::wf
+    inline const auto wf_parse_cleanup = init_parse::wf - Term 
     | (Top <<= Program)
     | (Program <<= (Group)++)
     ;
@@ -61,14 +61,13 @@ namespace miniml{
     inline const auto wf_parens =
     wf_fun
     | (Expr <<= (wf_exp_tokens_par)++[1])
-    | (Group <<= ((wf_group_tokens | Let) - Paren)++[1])
+    | (Group <<= (wf_group_tokens - Paren)++[1])
     ;
     inline const auto wf_let =
       wf_parens
     | (Program <<= TopExpr++)
     | (TopExpr <<= (Let | Expr))
     | (Let <<= Ident * Expr)
-    | (Expr <<= (wf_exp_tokens_par)++[1])
     ;
     inline const auto wf_exp_tokens_cond = wf_exp_tokens_par - Then - Else;
 

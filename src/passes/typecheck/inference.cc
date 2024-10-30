@@ -9,7 +9,7 @@ namespace miniml
   using namespace trieste;
   using namespace wf::ops;
 
-  // give function parameters and let declarations fresh types
+  // Give function parameters and let declarations fresh type variables
   PassDef inf_fresh()
   {
     return {
@@ -17,7 +17,7 @@ namespace miniml
         check::wf_fresh,
         (dir::bottomup),
         {
-            // create constraints for annotated params and introduce a new type variable
+            // Create constraints for annotated params and introduce a new type variable
             T(Param)[Param] << (T(Ident)[Ident] * T(Annotation)[Annotation]) >>
                 [](Match &_)
                 {
@@ -35,7 +35,7 @@ namespace miniml
                               << (Type << fresh_tvar())
                               << _(Expr));
                 },
-            // create constraint for function return type annotation
+            // Create constraint for function return type annotation
             T(FunDef)[FunDef] << (T(Ident)[Ident] * T(Annotation)[Annotation] * T(Param)[Param] * T(Expr)[Expr]) >>
                 [](Match &_)
                 {
@@ -44,7 +44,7 @@ namespace miniml
                   auto ret_vty = fresh_tvar();
                   auto fun_ty = arrow_type(arg_ty, ret_vty)->clone();
                   auto fundef = FunDef << _(Ident) << (Type << fun_ty) << _(Param) << _(Expr);
-                  // create constraints with annotated types
+                  // Create constraints with annotated types
                   if (!(ret_ty->type() == TNone))
                   {
                     auto constraint = eq_constraint(ret_vty, ret_ty, _(FunDef));
@@ -55,7 +55,7 @@ namespace miniml
                     return fundef;
                   }
                 },
-            // group constraints
+            // Group constraints
             T(TopExpr) << (T(EqConstr, InstConstr)++[Constraints] * T(Let, Expr)[Expr]) >>
                 [](Match &_)
                 {
@@ -67,7 +67,7 @@ namespace miniml
                 {
                   return (_(Constraints) << _[EqConstr]);
                 },
-            // fuzzing error ?? can this happen
+            // Fuzz error 
             T(Type) << T(TNone)[TNone] >>
                 [](Match &_)
                 {
@@ -84,7 +84,7 @@ namespace miniml
         check::wf_inf_exprs,
         (dir::bottomup),
         {
-            // CONSTANT EXPRS
+            // Constant expression
             T(Expr) << expr_const[Expr] >>
                 [](Match &_)
                 {
@@ -92,7 +92,7 @@ namespace miniml
                   auto typ = get_base_type(exp);
                   return Expr << (Type << typ) << exp;
                 },
-            // IDENT EXPRS
+            // Identifier expression
             T(Expr)[Expr] << T(Ident)[Ident] >>
                 [](Match &_)
                 {
@@ -117,7 +117,7 @@ namespace miniml
                     return err(_(Expr), "unbound variable " + node_val(_(Ident)));
                   }
                 },
-            // IF EXPRS
+            // Conditional
             T(Expr)[Lhs] << (T(If)[If] << ((T(Expr) << T(Type)[Expr]) * (T(Expr) << T(Type)[Then]) * (T(Expr) << T(Type)[Else]))) >>
                 [](Match &_)
                 {
@@ -131,7 +131,7 @@ namespace miniml
                   return Seq << (lift_constraints({exp_is_bool, ifelse_eq, ret_eq})) // lift constraints
                              << (Expr << (Type << fresh_typ) << _(If));
                 },
-            // BINOPS
+            // Binary operator
             T(Expr)[Expr] << (expr_binOp[Op]
                             << ((T(Expr) << (T(Type)[Lhs] * Any)) * (T(Expr) << (T(Type)[Rhs] * Any)))) >>
                 [](Match &_)
@@ -146,7 +146,7 @@ namespace miniml
                     : Seq << (lift_constraints({op_eqconstraint, eq_constraint(r_typ, int_type(), _(Expr))}))
                           << expr;
                 },
-            // FUNDEF
+            // Function definition 
             T(Expr) << (T(Fun)[Fun]
                         << (T(FunDef)[FunDef] << (T(Ident)[Ident] * (T(Type)[TypeArrow]) * T(Param)[Param] * (T(Expr)[Expr] << T(Type)[Type])))) >>
                 [](Match &_)
@@ -162,7 +162,7 @@ namespace miniml
                   return Seq << lift_constraint(expty_eq_retty)
                              << (Expr << (Type << fun_ty->clone()) << _(Fun));
                 },
-            // FUNAPP
+            // Function application
             T(Expr)[Expr] << (T(App)[App]
                               << ((T(Expr) << T(Type)[Lhs]) * (T(Expr) << T(Type)[Rhs]))) >>
                 [](Match &_)
@@ -191,7 +191,7 @@ namespace miniml
                     return err(_(Expr), errmsg);
                   }
                 },
-            // group constraints
+            // Group constraints
             T(TopExpr) << (T(EqConstr, InstConstr)++[Constraints] * T(Let, Expr)[Expr]) >>
                 [](Match &_)
                 {

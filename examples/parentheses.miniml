@@ -1,9 +1,7 @@
-let x = ();; 
-
 let f = fun f (x : int -> int) is (x (0));;
 
 
-let g = fun f x : (int -> int) is 
-    ((fun h (y:int) is y));; 
+let g = fun f x : (int -> int) is
+    ((fun h (y:int) is y));;
 
 (((102+33) * (8-3)));;

@@ -16,7 +16,7 @@ namespace miniml
 
     auto pop_until = [](Make &m, std::initializer_list<Token> target, std::initializer_list<Token> stop = {File}) {
       while (!m.in(target) && !m.group_in(target)
-             && !m.in(stop)) {
+             && !m.in(stop) && !m.group_in(stop)) {
         m.term();
         m.pop();
       }
@@ -140,10 +140,16 @@ namespace miniml
       if(m.mode() == "comment"){
         m.error("Unterminated comment");
       }
+      if (m.in(File)) {
+        // Empty file
+        return;
+      }
       m.term();
-      if(!m.in(Term)){
+      if(m.in(File)) {
         m.error("Missing ;; at end of statement");
-      } else m.pop(Term);
+      } else {
+        m.pop(Term);
+      }
     });
     return p;
   }

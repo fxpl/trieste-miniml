@@ -13,15 +13,21 @@ namespace miniml
             parse::wf_parse_cleanup,
             (dir::topdown),
             {
+                In(Top) * (T(File) << T(Group)[Group]) >>
+                    [](Match &_) -> Node
+                    {
+                        return Program << _[Group];
+                    },
                 In(Top) * (T(File) << T(Term)[Term]) >>
-                    [](Match &_)
+                    [](Match &_) -> Node
                     {
                         return Program << *_[Term];
                     },
-                In(Top) * !T(Program) >>
-                    [](Match &)
+
+                In(Top) * (T(File)) >>
+                    [](Match &) -> Node
                     {
-                        return Error << (ErrorMsg ^ "Missing ;;");
+                        return Program;
                     },
             }};
     }

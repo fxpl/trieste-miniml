@@ -26,16 +26,21 @@ namespace miniml{
 
     inline const wf::Wellformed wf =
       (Top <<= File)
-    | (File <<= (Term | Group))
-    | (Paren <<= Group++)
-    | (Term <<= (Group)++[1])
-    | (Group <<= (wf_parse_tokens)++[1])
+    | (File <<= ~(Term | Group))
+    | (Paren <<= ~Group)
+    | (Term <<= Group++[1])
+    | (Fun <<= ~Group)
+    | (Is <<= ~Group)
+    | (If <<= ~Group)
+    | (Then <<= ~Group)
+    | (Else <<= ~Group)
+    | (Group <<= wf_parse_tokens++[1])
     ;
 
     }
     namespace parse{
 
-    inline const auto wf_parse_cleanup = init_parse::wf - Term 
+    inline const auto wf_parse_cleanup = init_parse::wf - Term
     | (Top <<= Program)
     | (Program <<= (Group)++)
     ;
@@ -56,32 +61,39 @@ namespace miniml{
     | (Expr <<= (wf_exp_tokens_fun)++[1])
     | (Group <<= (wf_group_tokens)++[1])
     ;
+
     inline const auto wf_exp_tokens_par = (wf_exp_tokens_fun | Expr) - Paren;
+
+    inline const auto wf_group_tokens_par = (wf_group_tokens | Let) - Paren;
 
     inline const auto wf_parens =
     wf_fun
-    | (Expr <<= (wf_exp_tokens_par)++[1])
-    | (Group <<= (wf_group_tokens - Paren)++[1])
+    | (Expr <<= wf_exp_tokens_par++[1])
+    | (Group <<= wf_group_tokens_par++[1])
     ;
+
+    inline const auto wf_exp_tokens_cond = wf_exp_tokens_par - Then - Else;
+    inline const auto wf_group_tokens_cond = wf_group_tokens_par - Then - Else;
+
+    inline const auto wf_conditionals =
+      (wf_parens - Then - Else)
+    | (If <<= Expr * Expr * Expr)
+    | (Expr <<= wf_exp_tokens_cond++[1])
+    | (Group <<= wf_group_tokens_cond++[1])
+    ;
+
     inline const auto wf_let =
-      wf_parens
+      wf_conditionals
     | (Program <<= TopExpr++)
     | (TopExpr <<= (Let | Expr))
     | (Let <<= Ident * Expr)
-    ;
-    inline const auto wf_exp_tokens_cond = wf_exp_tokens_par - Then - Else;
-
-    inline const auto wf_conditionals =
-      wf_let
-    | (If <<= Expr * Expr * Expr)
-    | (Expr <<= (wf_exp_tokens_cond)++[1])
     ;
 
     inline const auto wf_exp_tokens_app =
       wf_exp_tokens_cond | App;
 
     inline const auto wf_funapp =
-      wf_conditionals
+      wf_let
     | (Expr <<= wf_exp_tokens_app++[1])
     | (App <<= (Lhs >>= Expr) * (Rhs >>= Expr))
     ;
@@ -166,4 +178,3 @@ namespace miniml{
 
     }
 }
-

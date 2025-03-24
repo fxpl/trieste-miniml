@@ -53,10 +53,11 @@ namespace miniml
   inline const auto Annotation = TokenDef("t_annotation");
   inline const auto Is  = TokenDef("is");
 
-  // Constants
+  // Conditionals
   inline const auto If = TokenDef("if");
   inline const auto Then = TokenDef("then");
   inline const auto Else = TokenDef("else");
+  inline const auto Cond = TokenDef("cond");
 
   // Identifiers
   inline const auto Ident = TokenDef("ident", flag::print);

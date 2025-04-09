@@ -7,7 +7,7 @@ build/miniml: build
 	cd build; ninja
 
 build:
-	mkdir -p build; cd build; cmake -G Ninja ../src -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_STANDARD=20
+	mkdir -p build; cd build; cmake -G Ninja ../src -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_STANDARD=20 -DCMAKE_EXPORT_COMPILE_COMMANDS=1
 
 buildf:
 	touch out/$f.trieste; ./build/miniml build examples/$f.miniml -o out/$f.trieste

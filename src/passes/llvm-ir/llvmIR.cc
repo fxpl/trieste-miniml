@@ -1,0 +1,183 @@
+#include "../../miniml-lang.hh"
+#include "../internal.hh"
+#include "../utils.hh"
+#include "trieste/pass.h"
+#include "trieste/rewrite.h"
+#include "trieste/token.h"
+
+#include <cstddef>
+#include <llvm-18/llvm/Support/raw_ostream.h>
+
+// LLVM code builder
+/**
+ * This is a workaround to prevent warnings from LLVM libraries
+ * being treated as errors by CMake.
+ */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wshadow"
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/NoFolder.h> // Ignore constant folding for educational purposes
+#include <llvm/IR/Verifier.h>
+#pragma clang diagnostic pop
+
+namespace miniml {
+
+  using namespace trieste;
+  using namespace llvm;
+
+  struct LLVMIRContext {
+    // Holds core data structures: Type and constant value tables.
+    llvm::LLVMContext llvm_context;
+    // Generates LLVM IR instructions.
+    // FIXME: NoFolder is used to prevent constant folding.
+    llvm::IRBuilder<NoFolder> builder;
+    // Contains generated instructions and local and global value tables.
+    llvm::Module llvm_module;
+    // Named variables, for keeping track of function arguments.
+    std::map<std::string, Value*> namedVars;
+    // Main function
+    llvm::Function* mainFunction;
+
+    // Maps register identifiers to their LLVM IR values.
+    std::map<std::string, Value*> registers;
+
+    LLVMIRContext()
+    : builder(llvm_context), llvm_module("miniML", llvm_context) {}
+
+    Value* result;
+
+    ~LLVMIRContext() {}
+  };
+
+  /**
+   * @brief
+   * This pass lowers to LLVM IR code.
+   */
+  PassDef generateLLVMIR() {
+    // Context shareable for all matches in the pass.
+    auto context = std::make_shared<LLVMIRContext>();
+
+    /**
+     * Bottom up pass that "recursively" generates LLVM IR.
+     * By traversing the child nodes before the parent, storing the instruction
+     * in the node we can ensure that IR can be generated for the parent node.
+     *
+     * Builder is used to create parts and store them in the node if it is a
+     * component. If the node is an instruction, it fetches the LLVM IR Values
+     * from the child nodes to emit the instruction.
+     */
+    PassDef pass = {
+      "generateLLVMIR",
+      LLVMIRGeneration::wf,
+      dir::bottomup | dir::once,
+      {
+        /**
+         * Addition-instruction
+         */
+        T(Instr)[Instr]
+            << (T(BinaryOp)
+                << (T(Add, Sub, Mul)[BinaryOp] << T(Ident)[Ident] * T(Type) *
+                      T(Int, Ident)[Lhs] * T(Int, Ident)[Rhs])) >>
+          [context](Match& _) -> Node {
+          // FIXME: Using T(Add,Sub,MUL) & T(Int,Ident) as match patterns is
+          // not scalable. Need to do something better
+
+          // LeftHandSide
+          Value* lhs = NULL;
+          if (_(Lhs)->type() == Ident) {
+            std::string ident = std::string(_(Lhs)->location().view());
+            lhs = context->registers[ident];
+          } else if (_(Lhs)->type() == Int) {
+            lhs = context->builder.getInt32(
+              std::stoi(std::string(_(Lhs)->location().view())));
+            ;
+          }
+
+          // RightHandSide
+          Value* rhs = NULL;
+          if (_(Rhs)->type() == Ident) {
+            std::string ident = std::string(_(Rhs)->location().view());
+            rhs = context->registers[ident];
+          } else if (_(Rhs)->type() == Int) {
+            rhs = context->builder.getInt32(
+              std::stoi(std::string(_(Rhs)->location().view())));
+            ;
+          }
+
+          // Ensure register map has been correctly populated by previous
+          // instructions.
+          assert(lhs);
+          assert(rhs);
+
+          // Result.
+          std::string resultStr = std::string(_(Ident)->location().view());
+
+          // Generate LLVM IR instruction.
+          Token op = _(BinaryOp)->type();
+          Value* result = NULL;
+          if (op == Add) {
+            result = context->builder.CreateAdd(lhs, rhs, resultStr);
+          } else if (op == Sub) {
+            result = context->builder.CreateSub(lhs, rhs, resultStr);
+          } else if (op == Mul) {
+            result = context->builder.CreateMul(lhs, rhs, resultStr);
+          }
+
+          assert(result);
+
+          // Map a register to the result.
+          context->registers[resultStr] = result;
+          // Store the result as program result (This way the last instruction
+          // sets the return value).
+          context->result = result;
+
+          // Do not alter the AST.
+          return _(Instr);
+        },
+      }};
+
+    pass.pre([context](Node) {
+      // FIXME: This is a hardcoded main function.
+      context->mainFunction = Function::Create(
+        // Function type: (void) -> i32.
+        FunctionType::get(Type::getInt32Ty(context->llvm_context), false),
+        Function::ExternalLinkage,
+        "main",
+        context->llvm_module);
+
+      // Create a basic block for the main function.
+      /**
+       * TODO: A function definition contains a list of basic blocks, i.e. the
+       * CFG for the function. Since we've not yet implemented branches or
+       * function calls, we only need one basic block.
+       */
+      BasicBlock* entry = BasicBlock::Create(
+        context->llvm_context, "entry", context->mainFunction);
+
+      // Set the builder to insert generated code into the entry block.
+      context->builder.SetInsertPoint(entry);
+
+      return 0;
+    });
+
+    pass.post([context](Node) {
+      // FIXME: Main now returns the result of the last instruction.
+      //        The return should be 0 in case of no errors.
+      //        The result of last instruction should be printed instead.
+      context->builder.CreateRet(context->result);
+
+      // FIXME: Temporarily write generated LLVM IR to file so can be compiled
+      // by make command.
+      std::error_code errorCode;
+      llvm::raw_fd_ostream outLLVMIR("out/test.ll", errorCode);
+      context->llvm_module.print(outLLVMIR, nullptr);
+
+      return 0;
+    });
+
+    return pass;
+  }
+}

@@ -47,6 +47,7 @@ std::vector<Pass> passes(){
 
       // LLVM IR generation
       compile(),
+      generateLLVMIR(),
     };
     }
 }

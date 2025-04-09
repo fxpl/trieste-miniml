@@ -85,5 +85,19 @@ namespace miniml
   inline const auto Ty22 = TokenDef("ty22");
   inline const auto Constr = TokenDef("constraint");
 
+  /**
+   * LLVM IR tokens
+   */ 
+  inline const auto Compile = TokenDef("compile");
+  inline const auto Instr = TokenDef("instr");
 
-}
+  inline const auto BinaryOp = TokenDef("binary_op");
+  inline const auto MemoryOp = TokenDef("memory_op");
+  inline const auto TerminatorOp = TokenDef("terminator_op");
+  inline const auto MiscOp = TokenDef("misc_op");
+
+  // MemoryOps
+  inline const auto Alloca = TokenDef("alloca");
+  inline const auto Load = TokenDef("load");
+  inline const auto Store = TokenDef("store");
+} 

@@ -177,4 +177,49 @@ namespace miniml{
     ;
 
     }
+
+  namespace LLVMIRGeneration{
+
+    inline const auto wf_fresh = 
+    (Top <<= Compile)
+    | (Compile <<= Program)
+    | (Program <<= TopExpr++)
+    | (TopExpr <<= (Let | Expr))
+    | (Let <<= Ident * Expr)
+    | (Expr <<= wf_expr)
+    | (If <<= Expr * Expr * Expr)
+    | (Fun <<= FunDef)
+    | (FunDef <<= Ident * Annotation * Param * Expr)[Ident]
+    | (Param <<= Ident * Annotation)
+    | (App <<= (Lhs >>= Expr) * (Rhs >>= Expr))
+    | (Mul <<= (Lhs >>= Expr) * (Rhs >>= Expr))
+    | (Add <<= (Lhs >>= Expr) * (Rhs >>= Expr))
+    | (Sub <<= (Lhs >>= Expr) * (Rhs >>= Expr))
+    | (LT <<= (Lhs >>= Expr) * (Rhs >>= Expr))
+    | (Equals <<= (Lhs >>= Expr) * (Rhs >>= Expr))
+    | (Annotation <<= Type >>= (wf_types | TNone))
+    | (TypeArrow <<= (Ty1 >>= wf_types) * (Ty2 >>= wf_types))
+    | (Type <<= (Type >>= wf_types | ForAllTy))
+    | (ForAllTy <<= TVars * Type)
+    | (TVars <<= TVar++)
+    | (Let <<= Ident * Type * Expr)
+    | (Expr <<= Type * (Expr >>= wf_expr))
+    | (Param <<= Ident * Type)
+    | (FunDef <<= Ident * Type * Param * Expr)
+    ;
+
+    inline const auto wf_operand = (Int | Ident);
+
+    inline const auto wf =
+    (Top <<= Instr++)
+    | (Instr <<= (BinaryOp | MemoryOp | TerminatorOp | MiscOp))
+    | (BinaryOp <<= (Add | Sub | Mul))
+    | (Add <<= Ident * Type * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
+    | (Sub <<= Ident * Type * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
+    | (Mul <<= Ident * Type * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
+    | (MemoryOp <<= (Alloca | Load | Store))
+    | (Type <<= (Type >>= wf_types | ForAllTy)) // From frontend
+    ;
+  
+  }
 }

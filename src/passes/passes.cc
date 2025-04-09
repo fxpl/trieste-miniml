@@ -10,8 +10,12 @@
 #include "parse/arith.cc"
 #include "parse/comparison.cc"
 #include "parse/cleanup.cc"
+
 #include "typecheck/inference.cc"
 #include "typecheck/solve_constraints.cc"
+
+#include "llvm-ir/compile.cc"
+#include "llvm-ir/llvmIR.cc"
 
 namespace miniml{
 
@@ -41,6 +45,8 @@ std::vector<Pass> passes(){
       solve_constraints(),
       cleanup_constraints(),
 
+      // LLVM IR generation
+      compile(),
     };
     }
 }

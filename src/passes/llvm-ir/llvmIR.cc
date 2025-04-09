@@ -5,9 +5,6 @@
 #include "trieste/rewrite.h"
 #include "trieste/token.h"
 
-#include <cstddef>
-#include <llvm-18/llvm/Support/raw_ostream.h>
-
 // LLVM code builder
 /**
  * This is a workaround to prevent warnings from LLVM libraries
@@ -16,6 +13,8 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-parameter"
 #pragma clang diagnostic ignored "-Wshadow"
+#include "llvm/Support/raw_ostream.h"
+
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
@@ -63,7 +62,8 @@ namespace miniml {
     /**
      * Bottom up pass that "recursively" generates LLVM IR.
      * By traversing the child nodes before the parent, storing the instruction
-     * in the node we can ensure that IR can be generated for the parent node.
+     * in the register map we can ensure that IR can be generated for the parent
+     * node.
      *
      * Builder is used to create parts and store them in the node if it is a
      * component. If the node is an instruction, it fetches the LLVM IR Values

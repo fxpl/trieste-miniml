@@ -33,12 +33,12 @@ out/%.trieste: examples/%.miniml | out
 test: $(OBJECTS) $(FAILING_OBJECTS)
 
 clean:
-	rm -rf out/* *.trieste
+	rm -rf out/* *.trieste; rm -rf build; rm -rf out
 
 .PHONY: clean all build/miniml test
 
 ## MANUAL TESTS FOR DEVELOPMENT ##
-llvm: generate-code print-miniml print-ast print-ll compile-llvm
+llvm: out generate-code print-miniml print-ast print-ll compile-llvm
 
 generate-code: all
 	touch out/test.trieste; > out/test.trieste; ./build/miniml build llvmir_tests/test.miniml -o out/test.trieste;

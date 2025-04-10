@@ -75,12 +75,12 @@ namespace miniml {
       dir::bottomup | dir::once,
       {
         /**
-         * Addition-instruction
-         */
+          * Binary Operations
+          */
         T(Instr)[Instr]
             << (T(BinaryOp)
-                << (T(Add, Sub, Mul)[BinaryOp] << T(Ident)[Ident] * T(Type) *
-                      T(Int, Ident)[Lhs] * T(Int, Ident)[Rhs])) >>
+                << (T(Add, Sub, Mul)[BinaryOp] << T(Ident)[Ident] *
+                      T(Type) * T(Int, Ident)[Lhs] * T(Int, Ident)[Rhs])) >>
           [context](Match& _) -> Node {
           // FIXME: Using T(Add,Sub,MUL) & T(Int,Ident) as match patterns is
           // not scalable. Need to do something better
@@ -113,31 +113,116 @@ namespace miniml {
           assert(rhs);
 
           // Result.
-          std::string resultStr = std::string(_(Ident)->location().view());
+          std::string resultId = std::string(_(Ident)->location().view());
 
           // Generate LLVM IR instruction.
           Token op = _(BinaryOp)->type();
           Value* result = NULL;
           if (op == Add) {
-            result = context->builder.CreateAdd(lhs, rhs, resultStr);
+            result = context->builder.CreateAdd(lhs, rhs, resultId);
           } else if (op == Sub) {
-            result = context->builder.CreateSub(lhs, rhs, resultStr);
+            result = context->builder.CreateSub(lhs, rhs, resultId);
           } else if (op == Mul) {
-            result = context->builder.CreateMul(lhs, rhs, resultStr);
+            result = context->builder.CreateMul(lhs, rhs, resultId);
           }
 
           assert(result);
 
           // Map a register to the result.
-          context->registers[resultStr] = result;
-          // Store the result as program result (This way the last instruction
-          // sets the return value).
+          context->registers[resultId] = result;
+          // Store the result as program result (This way the last
+          // instruction sets the return value).
           context->result = result;
 
           // Do not alter the AST.
           return _(Instr);
         },
-      }};
+
+        /**
+          * Memory Operations
+          */
+        // Alloca
+        T(Instr)[Instr]
+            << (T(MemoryOp)
+                << (T(Alloca)
+                    << T(Ident)[Ident] * (T(Type) << T(TInt)[Type]))) >>
+          [context](Match& _) -> Node {
+          std::string resultId = std::string(_(Ident)->location().view());
+
+          llvm::Type* type = NULL;
+          if (_(Type)->type() == TInt) {
+            type = context->builder.getInt32Ty();
+          } else {
+            // TODO: Error
+          }
+
+          AllocaInst* result =
+            context->builder.CreateAlloca(type, nullptr, resultId);
+
+          context->registers[resultId] = result;
+          context->result = result;
+
+          return _(Instr);
+        },
+
+        // Store
+        T(Instr)[Instr]
+            << (T(MemoryOp)
+                << (T(Store) << T(Ident)[IRValue] * T(Ident)[Dst])) >>
+          [context](Match& _) -> Node {
+          Value* value =
+            context->registers[std::string(_(IRValue)->location().view())];
+          Value* dst =
+            context->registers[std::string(_(Dst)->location().view())];
+          context->builder.CreateStore(value, dst);
+
+          return _(Instr);
+        },
+
+        // Load
+        T(Instr)[Instr]
+            << (T(MemoryOp)
+                << (T(Load) << T(Ident)[Ident] *
+                      (T(Type) << T(TInt)[Type]) * T(Ident)[Src])) >>
+          [context](Match& _) -> Node {
+          std::string resultId = std::string(_(Ident)->location().view());
+
+          llvm::Type* type = NULL;
+          if (_(Type)->type() == TInt) {
+            type = context->builder.getInt32Ty();
+          } else {
+            // TODO: Error
+          }
+
+          Value* src =
+            context->registers[std::string(_(Src)->location().view())];
+
+          assert(src);
+
+          Value* result = context->builder.CreateLoad(type, src, resultId);
+
+          context->registers[resultId] = result;
+          context->result = result;
+
+          return _(Instr);
+        },
+
+        /**
+          * Meta operations since LLVM IR does not allow assigning a register
+          * to another
+          */
+        T(RegCpy)[RegCpy] << T(Ident)[Dst] * T(Ident)[Src] >>
+          [context](Match& _) -> Node {
+          std::string dst = std::string(_(Dst)->location().view());
+          std::string src = std::string(_(Src)->location().view());
+          Value* srcVal = context->registers[src];
+          assert(srcVal);
+          context->registers[dst] = srcVal;
+
+          return _(RegCpy);
+        },
+      }
+    };
 
     pass.pre([context](Node) {
       // FIXME: This is a hardcoded main function.

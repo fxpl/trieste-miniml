@@ -62,6 +62,9 @@ namespace miniml
   // Identifiers
   inline const auto Ident = TokenDef("ident", flag::print);
 
+  // Printing
+  inline const auto Print = TokenDef("print");
+
   // Grouping tokens
   inline const auto TopExpr = TokenDef("topexpr"); // expressions/let decl at top level
   inline const auto Expr = TokenDef("expr");
@@ -87,7 +90,7 @@ namespace miniml
 
   /**
    * LLVM IR tokens
-   */ 
+   */
   inline const auto Compile = TokenDef("compile");
   inline const auto Instr = TokenDef("instr");
 
@@ -100,4 +103,4 @@ namespace miniml
   inline const auto Alloca = TokenDef("alloca");
   inline const auto Load = TokenDef("load");
   inline const auto Store = TokenDef("store");
-} 
+}

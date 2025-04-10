@@ -1,0 +1,2 @@
+let myPrint = print;;
+myPrint 42;;

@@ -10,7 +10,7 @@ namespace miniml{
     inline const auto wf_types = TInt | TBool | TVar | TypeArrow ;
     inline const auto wf_expr = Int | True | False
     | Add | Sub | Mul | LT | Equals
-    | If | Ident | Fun | App ;
+    | If | Ident | Fun | App | Print;
 
     namespace init_parse{
 
@@ -21,6 +21,7 @@ namespace miniml{
      If | Then | Else |
      Ident | Fun | Is | Let |
      Colon | Paren |
+     Print |
      wf_types
      ;
 
@@ -180,7 +181,7 @@ namespace miniml{
 
   namespace LLVMIRGeneration{
 
-    inline const auto wf_fresh = 
+    inline const auto wf_fresh =
     (Top <<= Compile)
     | (Compile <<= Program)
     | (Program <<= TopExpr++)
@@ -220,6 +221,6 @@ namespace miniml{
     | (MemoryOp <<= (Alloca | Load | Store))
     | (Type <<= (Type >>= wf_types | ForAllTy)) // From frontend
     ;
-  
+
   }
 }

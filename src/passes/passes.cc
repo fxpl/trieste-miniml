@@ -13,9 +13,11 @@
 
 #include "typecheck/inference.cc"
 #include "typecheck/solve_constraints.cc"
+#include "typecheck/resolve_print.cc"
 
 #include "llvm-ir/compile.cc"
 #include "llvm-ir/llvmIR.cc"
+
 
 namespace miniml{
 
@@ -44,6 +46,7 @@ std::vector<Pass> passes(){
       let_constr(),
       solve_constraints(),
       cleanup_constraints(),
+      resolve_print(),
 
       // LLVM IR generation
       compile(),

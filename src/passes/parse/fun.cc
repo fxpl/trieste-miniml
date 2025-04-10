@@ -52,6 +52,12 @@ PassDef fun() {
           return _(TypeArrow) << _(Lhs) << _(Rhs);
       },
 
+      // parse print primitive
+      --In(Expr) * T(Print)[Print] >>
+        [](Match& _) -> Node {
+          return Expr << _(Print);
+      },
+
       // errors
       // function bindings must have a fun id, a pattern (unary functions are simply val)
       // followed by an expression

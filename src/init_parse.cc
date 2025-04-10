@@ -120,6 +120,9 @@ namespace miniml
         // Integer
         "-?([[:digit:]]+|0x[[:xdigit:]]+)" >> [](auto& m) { m.add(Int); },
 
+        // Printing
+        "print\\b" >> [](auto& m) { m.add(Print); },
+
         // Ident. look at grammar for additional characters
         R"([_[:alpha:]][_[:alnum:]\']*)" >> [](auto& m) { m.add(Ident); },
 

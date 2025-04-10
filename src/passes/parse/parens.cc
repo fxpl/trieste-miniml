@@ -7,16 +7,16 @@ namespace miniml {
 
 using namespace trieste;
 
-  inline const auto exprs = expr_binOp / expr_const / expr_keywords / T(Fun,Ident,Expr); 
-  
+  inline const auto exprs = expr_binOp / expr_const / expr_keywords / T(Fun,Ident,Print,Expr);
+
   PassDef parens(){
       return {
       "parens",
       parse::wf_parens,
       dir::topdown,
       {
-      T(Paren) << T(Group)[Group] >> 
-      [](Match& _) { 
+      T(Paren) << T(Group)[Group] >>
+      [](Match& _) {
           return Expr << *_[Group];
       },
       T(Paren)[Paren] >>

@@ -1,0 +1,1 @@
+let print_id = fun id x is print x;;

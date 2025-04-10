@@ -100,4 +100,12 @@ namespace miniml
   inline const auto Alloca = TokenDef("alloca");
   inline const auto Load = TokenDef("load");
   inline const auto Store = TokenDef("store");
+  
+  // Helpers
+  inline const auto Global = TokenDef("global");
+  inline const auto IRValue = TokenDef("value");
+  inline const auto Src = TokenDef("src");
+  inline const auto Dst = TokenDef("dst");
+  inline const auto RegCpy = TokenDef("reg_cpy");
+
 } 

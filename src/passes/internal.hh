@@ -211,14 +211,18 @@ namespace miniml{
     inline const auto wf_operand = (Int | Ident);
 
     inline const auto wf =
-    (Top <<= Instr++)
+    (Top <<= (Instr | RegCpy)++)
+    | (RegCpy <<= (Dst >>= Ident) * (Src >>= Ident))
     | (Instr <<= (BinaryOp | MemoryOp | TerminatorOp | MiscOp))
-    | (BinaryOp <<= (Add | Sub | Mul))
-    | (Add <<= Ident * Type * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
-    | (Sub <<= Ident * Type * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
-    | (Mul <<= Ident * Type * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
-    | (MemoryOp <<= (Alloca | Load | Store))
-    | (Type <<= (Type >>= wf_types | ForAllTy)) // From frontend
+      | (BinaryOp <<= (Add | Sub | Mul))
+        | (Add <<= Ident * Type * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
+        | (Sub <<= Ident * Type * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
+        | (Mul <<= Ident * Type * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
+      | (MemoryOp <<= (Alloca | Load | Store))
+        | (Alloca <<= Ident * Type)
+        | (Load <<= Ident * Type * (Src >>= Ident))
+        | (Store <<= (IRValue >>= Ident) * (Dst >>= Ident))
+      | (Type <<= (Type >>= wf_types | ForAllTy)) // From frontend
     ;
   
   }

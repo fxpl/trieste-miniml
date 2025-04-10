@@ -57,6 +57,7 @@ namespace miniml {
           reapply << (Compile << _(Ident) << topexpr);
 
           // TODO: Is this still a good idea?
+          //
           //       Top
           //      /   \
           //  Ident   Program
@@ -69,23 +70,71 @@ namespace miniml {
         },
 
         /**
-         * Add evaluate expression and store it in tmp/register.
+         * Compile TopExpression.
          */
-        T(Compile) << T(Ident)[Ident] * (T(TopExpr) << T(Expr)[Expr]) >>
+        T(Compile) << T(Ident)[Ident] * (T(TopExpr) << T(Expr, Let)[Expr]) >>
           [](Match& _) -> Node {
           return Reapply << (Compile << _(Ident) << _(Expr));
         },
 
         /**
-         * Compile expression that is a single integer.
+         * Compile Let.
          */
         T(Compile) << T(Ident)[Ident] *
-              (T(Expr) << T(Type)[Type] * T(Int)[Int]) >>
+              (T(Let)[Let] << T(Ident)[Dst] * T(Type)[Type] * T(Expr)[Expr]) >>
           [](Match& _) -> Node {
-          // Enable storing to register by adding with 0
+          // TODO: Can't I just use registers for everything and let LLVM
+          // optimize?
+          //       Problem is both Ident and Dst need to hold the same register
+          //       This will probably be a problem when assigning functions to
+          //       names. It needs to be recompiled as a function declaration I
+          //       guess.
+
+          Node tmpPtr = Ident ^ _(Let)->fresh();
+
+          // TODO: Hardcoding type as TInt since unsure how to deal with
+          // ForAllTy
+          Node hardcodedType = (Type << TInt);
+
+          return Reapply
+            << (Compile << _(Dst) << _(Expr))
+            // Then copy it into _(Ident) so [[_]]ident still true.
+            << (Lift << Top
+                     << (Instr
+                         << (MemoryOp << (Alloca << tmpPtr << hardcodedType))))
+            << (Lift << Top
+                     << (Instr
+                         << (MemoryOp
+                             << (Store << _(Dst)->clone() << tmpPtr->clone()))))
+            << (Lift << Top
+                     << (Instr
+                         << (MemoryOp
+                             << (Load << _(Ident) << hardcodedType->clone()
+                                      << tmpPtr->clone()))));
+        },
+
+        /**
+         * Compile single integer.
+         */
+        T(Compile) << T(Ident)[Ident] *
+              (T(Expr) << (T(Type)[Type] << T(TInt)) * T(Int)[Int]) >>
+          [](Match& _) -> Node {
+          // Enable storing integers to register by adding with 0.
           return Instr
             << (BinaryOp
                 << (Add << _(Ident) << _(Type) << _(Int) << (Int ^ "0")));
+        },
+
+        /**
+         * Compile single identifier.
+         */
+        T(Compile) << T(Ident)[Dst] *
+              (T(Expr) << T(Type) * T(Ident)[Src]) >>
+          [](Match& _) -> Node {
+          // FIXME: This is pretty worthless, 
+          //        I'm just mapping a register to another.
+          //        Defer it to code generation pass for now.
+          return RegCpy << _(Dst) << _(Src);
         },
 
         /**
@@ -94,7 +143,7 @@ namespace miniml {
          * child Exprs.
          */
         T(Compile) << T(Ident)[Ident] *
-              (T(Expr) << T(Type)[Type] *
+              (T(Expr) << (T(Type)[Type] << T(TInt)) *
                  (T(Add, Sub, Mul)[BinaryOp] << T(Expr)[Lhs] * T(Expr)[Rhs])) >>
           [](Match& _) -> Node {
           Token op;

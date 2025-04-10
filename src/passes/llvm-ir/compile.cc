@@ -9,7 +9,7 @@ namespace miniml {
 
   /**
    * @brief
-   * This pass rewrites the AST to enable LLVM IR to be generated.
+
    * It works similar to denotational semantics where each miniML
    * expression is mapped to its meaning in LLVM IR.
    *
@@ -41,20 +41,22 @@ namespace miniml {
         T(Compile) << T(Ident)[Ident] * T(Program)[Program] >>
           [](Match& _) -> Node {
           auto prog = _(Program);
-          // FIXME: This Seq business doesn't seem to work.
-          Node seq = Seq;
-          for (size_t i = 0; i < prog->size(); i++) {
-            // FIXME: This generates a SEQ node, not what we want!
-            auto ident = _(Ident);
-            if (i != prog->size() - 1) {
-              ident = Ident ^ prog->fresh();
-            }
 
-            auto topexpr = prog->at(i);
-            seq << (Compile << ident << topexpr);
+          Node reapply = Reapply;
+
+          // Generate identifiers for each of the program's top expressions.
+          for (size_t i = 0; i < prog->size() - 1; i++) {
+            Node ident = Ident ^ prog->fresh();
+            Node topexpr = prog->at(i);
+
+            reapply << (Compile << ident << topexpr);
           }
 
-          // TODO: This should return a tree with structure:
+          // The last topexpression is bound to the identifier of the program.
+          Node topexpr = prog->at(prog->size() - 1);
+          reapply << (Compile << _(Ident) << topexpr);
+
+          // TODO: Is this still a good idea?
           //       Top
           //      /   \
           //  Ident   Program
@@ -63,10 +65,7 @@ namespace miniml {
           //
           // Where Ident holds the identifier of the program return value.
 
-          // FIXME: Now learnt that Seq and Reapply cannot be mixed,
-          //        Reapply introduces an implicit Seq.
-          //        Refactor this to use only one of them.
-          return Reapply << seq->back();
+          return reapply;
         },
 
         /**
@@ -74,7 +73,6 @@ namespace miniml {
          */
         T(Compile) << T(Ident)[Ident] * (T(TopExpr) << T(Expr)[Expr]) >>
           [](Match& _) -> Node {
-
           return Reapply << (Compile << _(Ident) << _(Expr));
         },
 
@@ -84,7 +82,6 @@ namespace miniml {
         T(Compile) << T(Ident)[Ident] *
               (T(Expr) << T(Type)[Type] * T(Int)[Int]) >>
           [](Match& _) -> Node {
-
           // Enable storing to register by adding with 0
           return Instr
             << (BinaryOp

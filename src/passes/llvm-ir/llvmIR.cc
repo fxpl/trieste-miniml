@@ -43,6 +43,9 @@ namespace miniml {
     // Maps register identifiers to their LLVM IR values.
     std::map<std::string, Value*> registers;
 
+    // Maps temporary identifiers to actual function names.
+    std::map<std::string, std::string> functions;
+
     LLVMIRContext()
     : builder(llvm_context), llvm_module("miniML", llvm_context) {}
 
@@ -50,6 +53,10 @@ namespace miniml {
 
     ~LLVMIRContext() {}
   };
+
+  // Helper function prototypes
+  void genExternalFunctions(std::shared_ptr<LLVMIRContext> context);
+  void genPrintFunctions(std::shared_ptr<LLVMIRContext> context);
 
   /**
    * @brief
@@ -69,190 +76,252 @@ namespace miniml {
      * component. If the node is an instruction, it fetches the LLVM IR Values
      * from the child nodes to emit the instruction.
      */
-    PassDef pass = {
-      "generateLLVMIR",
-      LLVMIRGeneration::wf,
-      dir::bottomup | dir::once,
-      {
-        /**
-          * Binary Operations
-          */
-        T(Instr)[Instr]
-            << (T(BinaryOp)
-                << (T(Add, Sub, Mul)[BinaryOp] << T(Ident)[Ident] *
-                      T(Type) * T(Int, Ident)[Lhs] * T(Int, Ident)[Rhs])) >>
-          [context](Match& _) -> Node {
-          // FIXME: Using T(Add,Sub,MUL) & T(Int,Ident) as match patterns is
-          // not scalable. Need to do something better
+    PassDef
+      pass =
+        {
+          "generateLLVMIR",
+          LLVMIRGeneration::wf,
+          dir::bottomup | dir::once,
+          {
+            /**
+             * Binary Operations
+             */
+            T(Instr)[Instr]
+                << (T(BinaryOp)
+                    << (T(Add, Sub, Mul)[BinaryOp] << T(Ident)[Ident] *
+                          T(Type) * T(Int, Ident)[Lhs] * T(Int, Ident)[Rhs])) >>
+              [context](Match& _) -> Node {
+              // FIXME: Using T(Add,Sub,MUL) & T(Int,Ident) as match patterns is
+              // not scalable. Need to do something better
 
-          // LeftHandSide
-          Value* lhs = NULL;
-          if (_(Lhs)->type() == Ident) {
-            std::string ident = std::string(_(Lhs)->location().view());
-            lhs = context->registers[ident];
-          } else if (_(Lhs)->type() == Int) {
-            lhs = context->builder.getInt32(
-              std::stoi(std::string(_(Lhs)->location().view())));
-            ;
-          }
+              // LeftHandSide
+              Value* lhs = NULL;
+              if (_(Lhs)->type() == Ident) {
+                std::string ident = std::string(_(Lhs)->location().view());
+                lhs = context->registers[ident];
+              } else if (_(Lhs)->type() == Int) {
+                lhs = context->builder.getInt32(
+                  std::stoi(std::string(_(Lhs)->location().view())));
+                ;
+              }
 
-          // RightHandSide
-          Value* rhs = NULL;
-          if (_(Rhs)->type() == Ident) {
-            std::string ident = std::string(_(Rhs)->location().view());
-            rhs = context->registers[ident];
-          } else if (_(Rhs)->type() == Int) {
-            rhs = context->builder.getInt32(
-              std::stoi(std::string(_(Rhs)->location().view())));
-            ;
-          }
+              // RightHandSide
+              Value* rhs = NULL;
+              if (_(Rhs)->type() == Ident) {
+                std::string ident = std::string(_(Rhs)->location().view());
+                rhs = context->registers[ident];
+              } else if (_(Rhs)->type() == Int) {
+                rhs = context->builder.getInt32(
+                  std::stoi(std::string(_(Rhs)->location().view())));
+                ;
+              }
 
-          // Ensure register map has been correctly populated by previous
-          // instructions.
-          assert(lhs);
-          assert(rhs);
+              // Ensure register map has been correctly populated by previous
+              // instructions.
+              assert(lhs);
+              assert(rhs);
 
-          // Result.
-          std::string resultId = std::string(_(Ident)->location().view());
+              // Result.
+              std::string resultId = std::string(_(Ident)->location().view());
 
-          // Generate LLVM IR instruction.
-          Token op = _(BinaryOp)->type();
-          Value* result = NULL;
-          if (op == Add) {
-            result = context->builder.CreateAdd(lhs, rhs, resultId);
-          } else if (op == Sub) {
-            result = context->builder.CreateSub(lhs, rhs, resultId);
-          } else if (op == Mul) {
-            result = context->builder.CreateMul(lhs, rhs, resultId);
-          }
+              // Generate LLVM IR instruction.
+              Token op = _(BinaryOp)->type();
+              Value* result = NULL;
+              if (op == Add) {
+                result = context->builder.CreateAdd(lhs, rhs, resultId);
+              } else if (op == Sub) {
+                result = context->builder.CreateSub(lhs, rhs, resultId);
+              } else if (op == Mul) {
+                result = context->builder.CreateMul(lhs, rhs, resultId);
+              }
 
-          assert(result);
+              assert(result);
 
-          // Map a register to the result.
-          context->registers[resultId] = result;
-          // Store the result as program result (This way the last
-          // instruction sets the return value).
-          context->result = result;
+              // Map a register to the result.
+              context->registers[resultId] = result;
+              // Store the result as program result (This way the last
+              // instruction sets the return value).
+              context->result = result;
 
-          // Do not alter the AST.
-          return _(Instr);
-        },
+              // Do not alter the AST.
+              return _(Instr);
+            },
 
-        /**
-          * Memory Operations
-          */
-        // Alloca
-        T(Instr)[Instr]
-            << (T(MemoryOp)
-                << (T(Alloca)
-                    << T(Ident)[Ident] * (T(Type) << T(TInt)[Type]))) >>
-          [context](Match& _) -> Node {
-          std::string resultId = std::string(_(Ident)->location().view());
+            /**
+             * Memory Operations
+             */
+            // Alloca
+            T(Instr)[Instr]
+                << (T(MemoryOp)
+                    << (T(Alloca)
+                        << T(Ident)[Ident] * (T(Type) << T(TInt)[Type]))) >>
+              [context](Match& _) -> Node {
+              std::string resultId = std::string(_(Ident)->location().view());
 
-          llvm::Type* type = NULL;
-          if (_(Type)->type() == TInt) {
-            type = context->builder.getInt32Ty();
-          } else {
-            // TODO: Error
-          }
+              llvm::Type* type = NULL;
+              if (_(Type)->type() == TInt) {
+                type = context->builder.getInt32Ty();
+              } else {
+                // TODO: Error
+              }
 
-          AllocaInst* result =
-            context->builder.CreateAlloca(type, nullptr, resultId);
+              AllocaInst* result =
+                context->builder.CreateAlloca(type, nullptr, resultId);
 
-          context->registers[resultId] = result;
-          context->result = result;
+              context->registers[resultId] = result;
+              context->result = result;
 
-          return _(Instr);
-        },
+              return _(Instr);
+            },
 
-        // Store
-        T(Instr)[Instr]
-            << (T(MemoryOp)
-                << (T(Store) << T(Ident)[IRValue] * T(Ident)[Dst])) >>
-          [context](Match& _) -> Node {
-          Value* value =
-            context->registers[std::string(_(IRValue)->location().view())];
-          Value* dst =
-            context->registers[std::string(_(Dst)->location().view())];
-          context->builder.CreateStore(value, dst);
+            // Store
+            T(Instr)[Instr]
+                << (T(MemoryOp)
+                    << (T(Store) << T(Ident)[IRValue] * T(Ident)[Dst])) >>
+              [context](Match& _) -> Node {
+              Value* value =
+                context->registers[std::string(_(IRValue)->location().view())];
+              Value* dst =
+                context->registers[std::string(_(Dst)->location().view())];
+              context->builder.CreateStore(value, dst);
 
-          return _(Instr);
-        },
+              return _(Instr);
+            },
 
-        // Load
-        T(Instr)[Instr]
-            << (T(MemoryOp)
-                << (T(Load) << T(Ident)[Ident] *
-                      (T(Type) << T(TInt)[Type]) * T(Ident)[Src])) >>
-          [context](Match& _) -> Node {
-          std::string resultId = std::string(_(Ident)->location().view());
+            // Load
+            T(Instr)[Instr]
+                << (T(MemoryOp)
+                    << (T(Load) << T(Ident)[Ident] *
+                          (T(Type) << T(TInt)[Type]) * T(Ident)[Src])) >>
+              [context](Match& _) -> Node {
+              std::string resultId = std::string(_(Ident)->location().view());
 
-          llvm::Type* type = NULL;
-          if (_(Type)->type() == TInt) {
-            type = context->builder.getInt32Ty();
-          } else {
-            // TODO: Error
-          }
+              llvm::Type* type = NULL;
+              if (_(Type)->type() == TInt) {
+                type = context->builder.getInt32Ty();
+              } else {
+                // TODO: Error
+              }
 
-          Value* src =
-            context->registers[std::string(_(Src)->location().view())];
+              Value* src =
+                context->registers[std::string(_(Src)->location().view())];
 
-          assert(src);
+              assert(src);
 
-          Value* result = context->builder.CreateLoad(type, src, resultId);
+              Value* result = context->builder.CreateLoad(type, src, resultId);
 
-          context->registers[resultId] = result;
-          context->result = result;
+              context->registers[resultId] = result;
+              context->result = result;
 
-          return _(Instr);
-        },
+              return _(Instr);
+            },
 
-        /**
-          * Meta operations since LLVM IR does not allow assigning a register
-          * to another
-          */
-        T(RegCpy)[RegCpy] << T(Ident)[Dst] * T(Ident)[Src] >>
-          [context](Match& _) -> Node {
-          std::string dst = std::string(_(Dst)->location().view());
-          std::string src = std::string(_(Src)->location().view());
-          Value* srcVal = context->registers[src];
-          assert(srcVal);
-          context->registers[dst] = srcVal;
+            /**
+             * Misc. Operations
+             */
+            T(Instr)
+                << (T(MiscOp)
+                    << (T(FunCall) << T(Ident)[Result] * T(Ident)[Fun] *
+                          T(Ident)[Param])) >>
+              [context](Match& _) -> Node {
+              std::string paramId = std::string(_(Param)->location().view());
+              Value* param = context->registers[paramId];
+              assert(param);
 
-          return _(RegCpy);
-        },
-      }
-    };
+              std::string tmpFuncId = std::string(_(Fun)->location().view());
+              std::string funcName = context->functions[tmpFuncId];
+              assert(funcName.empty() == false);
+
+              Function* function = context->llvm_module.getFunction(funcName);
+              assert(function);
+
+              std::string resultId = std::string(_(Result)->location().view());
+              Value* result =
+                context->builder.CreateCall(function, {param}, resultId);
+
+              context->registers[resultId] = result;
+              context->result = result;
+
+              return _(Instr);
+            },
+
+            /**
+             * Meta operations since LLVM IR does not allow assigning a register
+             * to another
+             */
+            T(Meta) << (T(RegCpy) << T(Ident)[Dst] * T(Ident)[Src]) >>
+              [context](Match& _) -> Node {
+              std::string dst = std::string(_(Dst)->location().view());
+              std::string src = std::string(_(Src)->location().view());
+              Value* srcVal = context->registers[src];
+              assert(srcVal);
+              context->registers[dst] = srcVal;
+
+              // Remove the meta node from the AST.
+              return {};
+            },
+
+            T(Meta) << (T(FuncMap) << T(Ident)[Ident] * T(Ident)[Fun]) >>
+              [context](Match& _) -> Node {
+              std::string tmpIdent = std::string(_(Ident)->location().view());
+              std::string functionName = std::string(_(Fun)->location().view());
+              context->functions[tmpIdent] = functionName;
+
+              // Remove the meta node from the AST.
+              return {};
+            },
+          }};
 
     pass.pre([context](Node) {
-      // FIXME: This is a hardcoded main function.
+      /**
+       * External functions
+       */
+      auto ctx = context;
+
+      genExternalFunctions(context);
+
+      /**
+       * Internal functions
+       */
+      genPrintFunctions(context);
+
+      // Main(void) -> i32
+      FunctionType* mainFuncType =
+        FunctionType::get(Type::getInt32Ty(context->llvm_context), false);
+
       context->mainFunction = Function::Create(
-        // Function type: (void) -> i32.
-        FunctionType::get(Type::getInt32Ty(context->llvm_context), false),
-        Function::ExternalLinkage,
+        mainFuncType,
+        Function::LinkageTypes::ExternalLinkage,
         "main",
         context->llvm_module);
 
-      // Create a basic block for the main function.
-      /**
-       * TODO: A function definition contains a list of basic blocks, i.e. the
-       * CFG for the function. Since we've not yet implemented branches or
-       * function calls, we only need one basic block.
-       */
       BasicBlock* entry = BasicBlock::Create(
         context->llvm_context, "entry", context->mainFunction);
 
-      // Set the builder to insert generated code into the entry block.
       context->builder.SetInsertPoint(entry);
 
       return 0;
     });
 
     pass.post([context](Node) {
-      // FIXME: Main now returns the result of the last instruction.
-      //        The return should be 0 in case of no errors.
-      //        The result of last instruction should be printed instead.
-      context->builder.CreateRet(context->result);
+      // TODO: Add support for last expression being something else than
+      // Integer.
+
+      // assert(context->result);
+
+      Function* printInt = context->llvm_module.getFunction("printInt");
+
+      assert(printInt);
+
+      context->builder.CreateCall(printInt, {context->builder.getInt32(42)});
+
+      // Return 0 to indicate success.
+      context->builder.CreateRet(context->builder.getInt32(0));
+
+      Function* main = context->llvm_module.getFunction("main");
+      verifyFunction(*main, &llvm::errs());
+
+      verifyModule(context->llvm_module, &llvm::errs());
 
       // FIXME: Temporarily write generated LLVM IR to file so can be compiled
       // by make command.
@@ -265,4 +334,46 @@ namespace miniml {
 
     return pass;
   }
+
+  void genExternalFunctions(std::shared_ptr<LLVMIRContext> context) {
+    // printf(char*) -> i32
+    FunctionType* printfFunctionType = FunctionType::get(
+      context->builder.getInt32Ty(),
+      {context->builder.getInt8Ty()->getPointerTo()},
+      true);
+    context->llvm_module.getOrInsertFunction("printf", printfFunctionType);
+  }
+
+  void genPrintFunctions(std::shared_ptr<LLVMIRContext> context) {
+    // Formatstring needed to make calls to printf
+    auto formatStrInt = context->builder.CreateGlobalStringPtr(
+      "%d\n", "formatStrInt", 0, &context->llvm_module);
+
+    // printInt(i32) -> i32
+    FunctionType* printIntType = FunctionType::get(
+      context->builder.getInt32Ty(), {context->builder.getInt32Ty()}, false);
+
+    Function* printInt = Function::Create(
+      printIntType,
+      Function::LinkageTypes::ExternalLinkage,
+      "printInt",
+      context->llvm_module);
+
+    printInt->setCallingConv(CallingConv::C);
+
+    BasicBlock* printIntBody =
+      BasicBlock::Create(context->llvm_context, "printIntBody", printInt);
+    context->builder.SetInsertPoint(printIntBody);
+
+    Argument* arg = printInt->arg_begin();
+    arg->setName("intToPrint");
+
+    Function* printfFunc = context->llvm_module.getFunction("printf");
+    context->builder.CreateCall(printfFunc, {formatStrInt, arg});
+
+    context->builder.CreateRet(arg);
+
+    verifyFunction(*printInt, &llvm::errs());
+  }
+
 }

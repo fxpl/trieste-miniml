@@ -179,19 +179,20 @@ namespace miniml{
 
     }
 
-  namespace LLVMIRGeneration{
+  namespace LLVMIRCompilation{
 
+    // For reference
     inline const auto wf_fresh =
-    (Top <<= Compile)
-    | (Compile <<= Program)
+    (Top <<= File)
+    | (File <<= Program)
     | (Program <<= TopExpr++)
     | (TopExpr <<= (Let | Expr))
-    | (Let <<= Ident * Expr)
-    | (Expr <<= wf_expr)
+    | (Let <<= Ident * Type * Expr)
+    | (Expr <<= Type * (Expr >>= wf_expr))
     | (If <<= Expr * Expr * Expr)
     | (Fun <<= FunDef)
-    | (FunDef <<= Ident * Annotation * Param * Expr)[Ident]
-    | (Param <<= Ident * Annotation)
+    | (FunDef <<= Ident * Type * Param * Expr)
+    | (Param <<= Ident * Type)
     | (App <<= (Lhs >>= Expr) * (Rhs >>= Expr))
     | (Mul <<= (Lhs >>= Expr) * (Rhs >>= Expr))
     | (Add <<= (Lhs >>= Expr) * (Rhs >>= Expr))
@@ -203,28 +204,40 @@ namespace miniml{
     | (Type <<= (Type >>= wf_types | ForAllTy))
     | (ForAllTy <<= TVars * Type)
     | (TVars <<= TVar++)
-    | (Let <<= Ident * Type * Expr)
-    | (Expr <<= Type * (Expr >>= wf_expr))
-    | (Param <<= Ident * Type)
-    | (FunDef <<= Ident * Type * Param * Expr)
     ;
 
     inline const auto wf_operand = (Int | Ident);
-
+    
     inline const auto wf =
-    (Top <<= (Instr | RegCpy)++)
-    | (RegCpy <<= (Dst >>= Ident) * (Src >>= Ident))
+    (Top <<= (Instr | Meta)++)
+    // Meta operations to handle LLVM IR limitations.
+    | (Meta <<= (RegCpy | FuncMap))
+      | (RegCpy <<= (Dst >>= Ident) * (Src >>= Ident))
+      | (FuncMap <<= Ident * (Fun >>= Ident))
+    // Real wf begins
     | (Instr <<= (BinaryOp | MemoryOp | TerminatorOp | MiscOp))
-      | (BinaryOp <<= (Add | Sub | Mul))
-        | (Add <<= Ident * Type * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
-        | (Sub <<= Ident * Type * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
-        | (Mul <<= Ident * Type * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
-      | (MemoryOp <<= (Alloca | Load | Store))
-        | (Alloca <<= Ident * Type)
-        | (Load <<= Ident * Type * (Src >>= Ident))
-        | (Store <<= (IRValue >>= Ident) * (Dst >>= Ident))
-      | (Type <<= (Type >>= wf_types | ForAllTy)) // From frontend
+    | (BinaryOp <<= (Add | Sub | Mul))
+      | (Add <<= (Result >>= Ident) * Type * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
+      | (Sub <<= (Result >>= Ident) * Type * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
+      | (Mul <<= (Result >>= Ident) * Type * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
+    | (MemoryOp <<= (Alloca | Load | Store))
+      | (Alloca <<= (Result >>= Ident) * Type)
+      | (Load <<= (Result >>= Ident) * Type * (Src >>= Ident))
+      | (Store <<= (IRValue >>= Ident) * (Dst >>= Ident))
+    | (MiscOp <<= (FunCall))
+      | (FunCall <<= (Result >>= Ident) * (Fun >>= Ident) * (Param >>= Ident))
+    | (Type <<= (Type >>= wf_types | ForAllTy)) // From frontend
     ;
-
   }
+
+  namespace LLVMIRGeneration {
+
+  inline const auto wf_operand = (Int | Ident);
+
+  inline const auto wf =
+    LLVMIRCompilation::wf - Meta
+    | (Top <<= (Instr)++)
+    ;
+      
+    }
 }

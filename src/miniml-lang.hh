@@ -105,9 +105,13 @@ namespace miniml
   inline const auto Store = TokenDef("store");
   
   // Helpers
+  inline const auto Meta = TokenDef("meta");
   inline const auto Global = TokenDef("global");
   inline const auto IRValue = TokenDef("value");
   inline const auto Src = TokenDef("src");
   inline const auto Dst = TokenDef("dst");
   inline const auto RegCpy = TokenDef("reg_cpy");
+  inline const auto FunCall = TokenDef("fun_call");
+  inline const auto Result = TokenDef("result");
+  inline const auto FuncMap = TokenDef("func_map");
 } 

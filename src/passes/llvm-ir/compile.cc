@@ -9,7 +9,7 @@ namespace miniml {
 
   /**
    * @brief
-
+   *
    * It works similar to denotational semantics where each miniML
    * expression is mapped to its meaning in LLVM IR.
    *
@@ -23,7 +23,7 @@ namespace miniml {
   PassDef compile() {
     return {
       "compile",
-      LLVMIRGeneration::wf,
+      LLVMIRCompilation::wf,
       (dir::topdown | dir::once),
       {
         /**
@@ -128,19 +128,16 @@ namespace miniml {
         /**
          * Compile single identifier.
          */
-        T(Compile) << T(Ident)[Dst] *
-              (T(Expr) << T(Type) * T(Ident)[Src]) >>
+        T(Compile) << T(Ident)[Dst] * (T(Expr) << T(Type) * T(Ident)[Src]) >>
           [](Match& _) -> Node {
-          // FIXME: This is pretty worthless, 
-          //        I'm just mapping a register to another.
-          //        Defer it to code generation pass for now.
-          return RegCpy << _(Dst) << _(Src);
+          // FIXME: This is required to handle programs that end in :
+          // let x = 3;;
+          // x;;
+          return Meta << (RegCpy << _(Dst) << _(Src));
         },
 
         /**
-         * Compiles an addition by:
-         * appending a binary Op instruction and inserting Compile nodes for its
-         * child Exprs.
+         * Compile binary operation.
          */
         T(Compile) << T(Ident)[Ident] *
               (T(Expr) << (T(Type)[Type] << T(TInt)) *
@@ -157,16 +154,73 @@ namespace miniml {
             // TODO: Return error
           }
 
-          Node LhsIdent = Ident ^ _(Lhs)->fresh();
-          Node RhsIdent = Ident ^ _(Rhs)->fresh();
+          Node reapply = Reapply;
 
-          return Reapply << (Compile << LhsIdent->clone() << _(Lhs))
-                         << (Compile << RhsIdent->clone() << _(Rhs))
+          // Avoids compilation of identifier expressions.
+          // TODO: I am worried that this needs to be implemented in many rules
+          Node LhsIdent;
+          if (_(Lhs) / Expr == Ident) {
+            LhsIdent = _(Lhs) / Expr;
+          } else {
+            LhsIdent = Ident ^ _(Lhs)->fresh();
+            reapply << (Compile << LhsIdent->clone() << _(Lhs));
+          }
+
+          Node RhsIdent;
+          if (_(Rhs) / Expr == Ident) {
+            RhsIdent = _(Rhs) / Expr;
+          } else {
+            RhsIdent = Ident ^ _(Rhs)->fresh();
+            reapply << (Compile << RhsIdent->clone() << _(Rhs));
+          }
+
+          // Instruction
+          reapply
+            << (Lift << Top
+                     << (Instr
+                         << (BinaryOp
+                             << (op << _(Ident) << _(Type) << LhsIdent
+                                    << RhsIdent))));
+          return reapply;
+        },
+
+        /**
+         * Apply
+         */
+        T(Compile) << T(Ident)[Ident] *
+              (T(Expr) << (T(Type) << T(TInt)[Type]) *
+                 (T(App) << (T(Expr)[Fun]) * T(Expr)[Param])) >>
+          [](Match& _) -> Node {
+          Node argIdent = Ident ^ _(Param)->fresh();
+          Node funIdent = Ident ^ _(Fun)->fresh();
+
+          return Reapply << (Compile << argIdent->clone() << _(Param))
+                         << (Compile << funIdent->clone() << _(Fun))
                          << (Lift << Top
                                   << (Instr
-                                      << (BinaryOp
-                                          << (op << _(Ident) << _(Type)
-                                                 << LhsIdent << RhsIdent))));
+                                      << (MiscOp
+                                          << (FunCall << _(Ident) << funIdent
+                                                      << argIdent))));
+        },
+
+        /**
+         * Print
+         */
+        T(Compile) << T(Ident)[Ident] *
+              (T(Expr) << (T(Type) << T(TypeArrow)[TypeArrow]) * T(Print)) >>
+          [](Match& _) -> Node {
+
+          Node funcName = NULL;
+          if ((_(TypeArrow) / Ty1 == TInt) && (_(TypeArrow) / Ty2 == TInt)) {
+            funcName = Ident ^ "printInt";
+          } // else if ()
+          // TODO: Support print for other types.
+
+          if (!funcName) {
+            return err(_(TypeArrow), "print function with this type not found");
+          }
+
+          return Lift << Top << (Meta << (FuncMap << _(Ident) << funcName));
         },
       }};
   }

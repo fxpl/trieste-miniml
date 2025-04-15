@@ -83,17 +83,15 @@ namespace miniml {
         T(Compile) << T(Ident)[Ident] *
               (T(Let)[Let] << T(Ident)[Dst] * T(Type)[Type] * T(Expr)[Expr]) >>
           [](Match& _) -> Node {
-          // TODO: Can't I just use registers for everything and let LLVM
-          // optimize?
-          //       Problem is both Ident and Dst need to hold the same register
-          //       This will probably be a problem when assigning functions to
-          //       names. It needs to be recompiled as a function declaration I
-          //       guess.
+          // TODO: Let now stores it on the stack and then loads it into a
+          // register. Should probably just store it and use another token as
+          // Identifier so it is translated into a load before use.
 
           Node tmpPtr = Ident ^ _(Let)->fresh();
 
-          // TODO: Hardcoding type as TInt since unsure how to deal with
-          // ForAllTy
+          // TODO: Need to deal with ForAllTy. Until I figure out how, use
+          // hardcoded type.
+          // FIXME: Let cannot be used for booleans.
           Node hardcodedType = (Type << TInt);
 
           return Reapply
@@ -117,8 +115,7 @@ namespace miniml {
          * Boolean
          */
         T(Compile) << T(Ident)[Ident] *
-              (T(Expr) << (T(Type) << T(TBool)[Type]) *
-                 T(True, False)[IRValue]) >>
+              (T(Expr) << (T(Type) << T(TBool)) * T(True, False)[IRValue]) >>
           [](Match& _) -> Node {
           Node value = NULL;
           if (_(IRValue) == True) {
@@ -126,7 +123,6 @@ namespace miniml {
           } else if (_(IRValue) == False) {
             value = IRValue ^ "0";
           }
-
           assert(value);
 
           return Meta << (RegMap << _(Ident) << Ti1 << value);
@@ -136,12 +132,11 @@ namespace miniml {
          * Integer
          */
         T(Compile) << T(Ident)[Ident] *
-              (T(Expr) << (T(Type)[Type] << T(TInt)) * T(Int)[Int]) >>
+              (T(Expr) << (T(Type) << T(TInt)) * T(Int)[Int]) >>
           [](Match& _) -> Node {
-          // Enable storing integers to register by adding with 0.
-          return Instr
-            << (BinaryOp
-                << (Add << _(Ident) << _(Type) << _(Int) << (Int ^ "0")));
+          Node value = IRValue ^ node_val(_(Int));
+
+          return Meta << (RegMap << _(Ident) << Ti32 << value);
         },
 
         /**
@@ -162,45 +157,29 @@ namespace miniml {
               (T(Expr) << (T(Type)[Type] << T(TInt)) *
                  (T(Add, Sub, Mul)[BinaryOp] << T(Expr)[Lhs] * T(Expr)[Rhs])) >>
           [](Match& _) -> Node {
-          Token op;
-          if (_(BinaryOp)->type() == Add) {
+          Node op = NULL;
+          if (_(BinaryOp) == Add) {
             op = Add;
-          } else if (_(BinaryOp)->type() == Sub) {
+          } else if (_(BinaryOp) == Sub) {
             op = Sub;
-          } else if (_(BinaryOp)->type() == Mul) {
+          } else if (_(BinaryOp) == Mul) {
             op = Mul;
           } else {
-            // TODO: Return error
+            return err(_(BinaryOp), "binary operation not supported");
           }
+          assert(op);
 
-          Node reapply = Reapply;
-
-          // Avoids compilation of identifier expressions.
-          // TODO: I am worried that this needs to be implemented in many rules
-          Node LhsIdent;
-          if (_(Lhs) / Expr == Ident) {
-            LhsIdent = _(Lhs) / Expr;
-          } else {
-            LhsIdent = Ident ^ _(Lhs)->fresh();
-            reapply << (Compile << LhsIdent->clone() << _(Lhs));
-          }
-
-          Node RhsIdent;
-          if (_(Rhs) / Expr == Ident) {
-            RhsIdent = _(Rhs) / Expr;
-          } else {
-            RhsIdent = Ident ^ _(Rhs)->fresh();
-            reapply << (Compile << RhsIdent->clone() << _(Rhs));
-          }
+          Node lhsIdent = Ident ^ _(Lhs)->fresh();
+          Node rhsIdent = Ident ^ _(Rhs)->fresh();
 
           // Instruction
-          reapply
-            << (Lift << Top
-                     << (Instr
-                         << (BinaryOp
-                             << (op << _(Ident) << _(Type) << LhsIdent
-                                    << RhsIdent))));
-          return reapply;
+          return Reapply << (Compile << lhsIdent->clone() << _(Lhs))
+                         << (Compile << rhsIdent->clone() << _(Rhs))
+                         << (Lift << Top
+                                  << (Instr
+                                      << (BinaryOp
+                                          << (op << _(Ident) << _(Type)
+                                                 << lhsIdent << rhsIdent))));
         },
 
         /**
@@ -215,7 +194,7 @@ namespace miniml {
             return err(_(Op), "comparison operands have different types");
           }
 
-          Node type = _(Lhs) / Type / Type;
+          Node type = get_type(_(Lhs));
           Node llvmType = NULL;
           if (type == TInt) {
             llvmType = Ti32;
@@ -224,13 +203,12 @@ namespace miniml {
           }
 
           Node op = NULL;
-          // TODO: Fix compare
           if (_(Op) == Equals) {
             op = Eq;
           } else if (_(Op) == LT) {
             op = Ult;
           } else {
-            // TODO: Return error
+            return err(_(Op), "comparison operator not supported");
           }
 
           Node lhsIdent = Ident ^ _(Lhs)->fresh();
@@ -271,6 +249,12 @@ namespace miniml {
               (T(Expr) << (T(Type) << T(TypeArrow)[TypeArrow]) * T(Print)) >>
           [](Match& _) -> Node {
           Node funcName = NULL;
+          std::cout << (_(TypeArrow) / Ty1)->type() << std::endl;
+          
+          if ((_(TypeArrow) / Ty1)->type() != (_(TypeArrow) / Ty2)->type()) {
+            return err(_(TypeArrow), "print is an identity function");
+          }
+
           if ((_(TypeArrow) / Ty1 == TInt) && (_(TypeArrow) / Ty2 == TInt)) {
             funcName = Ident ^ "printInt";
           } else if (

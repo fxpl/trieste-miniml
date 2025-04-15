@@ -89,62 +89,34 @@ namespace miniml {
              */
             T(Instr)[Instr]
                 << (T(BinaryOp)
-                    << (T(Add, Sub, Mul)[BinaryOp] << T(Ident)[Ident] *
-                          T(Type) * T(Int, Ident)[Lhs] * T(Int, Ident)[Rhs])) >>
+                    << (T(Add, Sub, Mul)[Op] << T(Ident)[Ident] * T(Type) *
+                          T(Int, Ident)[Lhs] * T(Int, Ident)[Rhs])) >>
               [context](Match& _) -> Node {
               // FIXME: Using T(Add,Sub,MUL) & T(Int,Ident) as match patterns is
               // not scalable. Need to do something better
 
-              // LeftHandSide
-              Value* lhs = NULL;
-              if (_(Lhs)->type() == Ident) {
-                std::string ident = std::string(_(Lhs)->location().view());
-                lhs = context->registers[ident];
-              } else if (_(Lhs)->type() == Int) {
-                lhs = context->builder.getInt32(
-                  std::stoi(std::string(_(Lhs)->location().view())));
-                ;
-              }
-
-              // RightHandSide
-              Value* rhs = NULL;
-              if (_(Rhs)->type() == Ident) {
-                std::string ident = std::string(_(Rhs)->location().view());
-                rhs = context->registers[ident];
-              } else if (_(Rhs)->type() == Int) {
-                rhs = context->builder.getInt32(
-                  std::stoi(std::string(_(Rhs)->location().view())));
-                ;
-              }
-
-              // Ensure register map has been correctly populated by previous
-              // instructions.
+              std::string lhsId = node_val(_(Lhs));
+              Value* lhs = context->registers[lhsId];
               assert(lhs);
+
+              std::string rhsId = node_val(_(Rhs));
+              Value* rhs = context->registers[rhsId];
               assert(rhs);
 
-              // Result.
-              std::string resultId = std::string(_(Ident)->location().view());
-
-              // Generate LLVM IR instruction.
-              Token op = _(BinaryOp)->type();
+              std::string resultId = node_val(_(Ident));
               Value* result = NULL;
-              if (op == Add) {
+              if (_(Op) == Add) {
                 result = context->builder.CreateAdd(lhs, rhs, resultId);
-              } else if (op == Sub) {
+              } else if (_(Op) == Sub) {
                 result = context->builder.CreateSub(lhs, rhs, resultId);
-              } else if (op == Mul) {
+              } else if (_(Op) == Mul) {
                 result = context->builder.CreateMul(lhs, rhs, resultId);
               }
-
               assert(result);
 
-              // Map a register to the result.
               context->registers[resultId] = result;
-              // Store the result as program result (This way the last
-              // instruction sets the return value).
               context->result = result;
 
-              // Do not alter the AST.
               return _(Instr);
             },
 
@@ -157,13 +129,14 @@ namespace miniml {
                     << (T(Alloca)
                         << T(Ident)[Ident] * (T(Type) << T(TInt)[Type]))) >>
               [context](Match& _) -> Node {
-              std::string resultId = std::string(_(Ident)->location().view());
+              std::string resultId = node_val(_(Ident));
 
               llvm::Type* type = NULL;
               if (_(Type)->type() == TInt) {
                 type = context->builder.getInt32Ty();
               } else {
-                // TODO: Error
+                return err(
+                  _(Type), "Type not supported for alloca instruction");
               }
 
               AllocaInst* result =
@@ -180,10 +153,8 @@ namespace miniml {
                 << (T(MemoryOp)
                     << (T(Store) << T(Ident)[IRValue] * T(Ident)[Dst])) >>
               [context](Match& _) -> Node {
-              Value* value =
-                context->registers[std::string(_(IRValue)->location().view())];
-              Value* dst =
-                context->registers[std::string(_(Dst)->location().view())];
+              Value* value = context->registers[node_val(_(IRValue))];
+              Value* dst = context->registers[node_val(_(Dst))];
               context->builder.CreateStore(value, dst);
 
               return _(Instr);
@@ -195,18 +166,16 @@ namespace miniml {
                     << (T(Load) << T(Ident)[Ident] *
                           (T(Type) << T(TInt)[Type]) * T(Ident)[Src])) >>
               [context](Match& _) -> Node {
-              std::string resultId = std::string(_(Ident)->location().view());
+              // TODO: Handle other types
+              std::string resultId = node_val(_(Ident));
 
               llvm::Type* type = NULL;
               if (_(Type)->type() == TInt) {
                 type = context->builder.getInt32Ty();
               }
-
               assert(type);
 
-              Value* src =
-                context->registers[std::string(_(Src)->location().view())];
-
+              Value* src = context->registers[node_val(_(Src))];
               assert(src);
 
               Value* result = context->builder.CreateLoad(type, src, resultId);
@@ -226,18 +195,18 @@ namespace miniml {
                     << (T(Call) << T(Ident)[Result] * T(Ident)[Fun] *
                           T(Ident)[Param])) >>
               [context](Match& _) -> Node {
-              std::string paramId = std::string(_(Param)->location().view());
+              std::string paramId = node_val(_(Param));
               Value* param = context->registers[paramId];
               assert(param);
 
-              std::string tmpFuncId = std::string(_(Fun)->location().view());
+              std::string tmpFuncId = node_val(_(Fun));
               std::string funcName = context->functions[tmpFuncId];
               assert(!funcName.empty());
 
               Function* function = context->llvm_module.getFunction(funcName);
               assert(function);
 
-              std::string resultId = std::string(_(Result)->location().view());
+              std::string resultId = node_val(_(Result));
               Value* result =
                 context->builder.CreateCall(function, {param}, resultId);
 
@@ -260,15 +229,15 @@ namespace miniml {
                 return err(_(Type), "Not a valid type for comparison");
               }
 
-              std::string lhsId = std::string(_(Lhs)->location().view());
+              std::string lhsId = node_val(_(Lhs));
               Value* lhs = context->registers[lhsId];
               assert(lhs);
 
-              std::string rhsId = std::string(_(Rhs)->location().view());
+              std::string rhsId = node_val(_(Rhs));
               Value* rhs = context->registers[rhsId];
               assert(rhs);
 
-              std::string resultId = std::string(_(Ident)->location().view());
+              std::string resultId = node_val(_(Ident));
 
               Value* result = NULL;
               if (_(Op) == Eq) {
@@ -293,8 +262,8 @@ namespace miniml {
             // Copy register value from Src to Dst.
             T(Meta) << (T(RegCpy) << T(Ident)[Dst] * T(Ident)[Src]) >>
               [context](Match& _) -> Node {
-              std::string dst = std::string(_(Dst)->location().view());
-              std::string src = std::string(_(Src)->location().view());
+              std::string dst = node_val(_(Dst));
+              std::string src = node_val(_(Src));
               Value* srcVal = context->registers[src];
               assert(srcVal);
               context->registers[dst] = srcVal;
@@ -306,21 +275,21 @@ namespace miniml {
             // Map the temporary id `Ident` to function name `Fun`.
             T(Meta) << (T(FuncMap) << T(Ident)[Ident] * T(Ident)[Fun]) >>
               [context](Match& _) -> Node {
-              std::string tmpIdent = std::string(_(Ident)->location().view());
-              std::string functionName = std::string(_(Fun)->location().view());
+              std::string tmpIdent = node_val(_(Ident));
+              std::string functionName = node_val(_(Fun));
               context->functions[tmpIdent] = functionName;
 
               // Remove the meta node from the AST.
               return {};
             },
 
-            // Map the register `Ident` to Value* `IRValue`.
+            // Map the temporary `Ident` to Value* `IRValue`.
             T(Meta)
                 << (T(RegMap) << T(Ident)[Ident] * T(Ti32, Ti1)[Type] *
                       T(IRValue)[IRValue]) >>
               [context](Match& _) -> Node {
-              std::string regId = std::string(_(Ident)->location().view());
-              std::string valueStr = std::string(_(IRValue)->location().view());
+              std::string regId = node_val(_(Ident));
+              std::string valueStr = node_val(_(IRValue));
 
               Value* value = NULL;
               if (_(Type) == Ti32) {

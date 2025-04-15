@@ -210,17 +210,17 @@ namespace miniml {
               (T(Expr) << (T(Type) << T(TBool)) *
                  (T(Equals, LT)[Op] << T(Expr)[Lhs] * T(Expr)[Rhs])) >>
           [](Match& _) -> Node {
-
-          if ((_(Lhs)/Type/Type)->type() != (_(Rhs)/Type/Type)->type()) {
+          if (
+            (_(Lhs) / Type / Type)->type() != (_(Rhs) / Type / Type)->type()) {
             return err(_(Op), "comparison operands have different types");
           }
-          
-          Node type = _(Lhs)/Type/Type;
+
+          Node type = _(Lhs) / Type / Type;
           Node llvmType = NULL;
           if (type == TInt) {
             llvmType = Ti32;
           } else {
-            return err(_(Lhs)/Type, "comparison type not supported");
+            return err(_(Lhs) / Type, "comparison type not supported");
           }
 
           Node op = NULL;
@@ -249,7 +249,7 @@ namespace miniml {
          * Apply
          */
         T(Compile) << T(Ident)[Ident] *
-              (T(Expr) << (T(Type) << T(TInt)[Type]) *
+              (T(Expr) << (T(Type) << T(TInt, TBool)[Type]) *
                  (T(App) << (T(Expr)[Fun]) * T(Expr)[Param])) >>
           [](Match& _) -> Node {
           Node argIdent = Ident ^ _(Param)->fresh();

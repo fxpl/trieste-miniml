@@ -181,7 +181,8 @@ namespace miniml{
 
   namespace LLVMIRCompilation{
 
-    // For reference
+    // FIXME: Only for reference.
+    //        Unfolded version of WF from typechecker
     inline const auto wf_fresh =
     (Top <<= File)
     | (File <<= Program)
@@ -246,8 +247,9 @@ namespace miniml{
       | (Store <<= (IRValue >>= Ident) * (Dst >>= Ident))
     | (MiscOp <<= (Call | Icmp))
       | (Call <<= (Result >>= Ident) * (Fun >>= Ident) * (Param >>= Ident))
-      | (Icmp <<= (Result >>= Ident) * (Comp >>= wf_comparison) * (Type >>= wf_llvm_types) * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
-    | (Type <<= (Type >>= wf_types | ForAllTy)) // From frontend
+      | (Icmp <<= (Result >>= Ident) * (Op >>= wf_comparison) * (Type >>= wf_llvm_types) * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
+    // TODO: From frontend, should be replaced by LLVM tokens.
+    | (Type <<= (Type >>= wf_types | ForAllTy)) 
     ;
   }
 

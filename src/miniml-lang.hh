@@ -92,26 +92,51 @@ namespace miniml
    * LLVM IR tokens
    */
   inline const auto Compile = TokenDef("compile");
+
   inline const auto Instr = TokenDef("instr");
-
   inline const auto BinaryOp = TokenDef("binary_op");
-  inline const auto MemoryOp = TokenDef("memory_op");
   inline const auto TerminatorOp = TokenDef("terminator_op");
-  inline const auto MiscOp = TokenDef("misc_op");
-
+  
   // MemoryOps
+  inline const auto MemoryOp = TokenDef("memory_op");
   inline const auto Alloca = TokenDef("alloca");
   inline const auto Load = TokenDef("load");
   inline const auto Store = TokenDef("store");
   
-  // Helpers
+  // MiscOps
+  inline const auto MiscOp = TokenDef("misc_op");
+  inline const auto Call = TokenDef("call");
+  inline const auto Icmp = TokenDef("icmp");
+  
+  // Meta operations (Not apart of LLVM IR)
   inline const auto Meta = TokenDef("meta");
+  inline const auto RegCpy = TokenDef("reg_cpy");
+  inline const auto RegMap = TokenDef("reg_map");
+  inline const auto FuncMap = TokenDef("func_map");
+  
+  // Helpers
   inline const auto Global = TokenDef("global");
   inline const auto IRValue = TokenDef("value");
   inline const auto Src = TokenDef("src");
   inline const auto Dst = TokenDef("dst");
-  inline const auto RegCpy = TokenDef("reg_cpy");
-  inline const auto FunCall = TokenDef("fun_call");
   inline const auto Result = TokenDef("result");
-  inline const auto FuncMap = TokenDef("func_map");
-} 
+
+  // LLVM IR Types
+  inline const auto Ti32 = TokenDef("i32");
+  inline const auto Ti1 = TokenDef("i1");
+
+  // Comparison operations
+  inline const auto Comp = TokenDef("comp");
+  inline const auto Eq = TokenDef("eq");
+  inline const auto Ne = TokenDef("ne");
+  // Unsigned
+  inline const auto Ugt = TokenDef("ugt");
+  inline const auto Uge = TokenDef("uge");
+  inline const auto Ult = TokenDef("ult");
+  inline const auto Ule = TokenDef("ule");
+  // Signed
+  inline const auto Sgt = TokenDef("sgt");
+  inline const auto Sge = TokenDef("sge");
+  inline const auto Slt = TokenDef("slt");
+  inline const auto Sle = TokenDef("sle");
+}

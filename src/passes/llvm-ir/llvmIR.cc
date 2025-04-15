@@ -56,7 +56,8 @@ namespace miniml {
 
   // Helper function prototypes
   void genExternalFunctions(std::shared_ptr<LLVMIRContext> context);
-  void genPrintFunctions(std::shared_ptr<LLVMIRContext> context);
+  void genPrintInt(std::shared_ptr<LLVMIRContext> context);
+  void genPrintBool(std::shared_ptr<LLVMIRContext> context);
 
   /**
    * @brief
@@ -199,9 +200,9 @@ namespace miniml {
               llvm::Type* type = NULL;
               if (_(Type)->type() == TInt) {
                 type = context->builder.getInt32Ty();
-              } else {
-                // TODO: Error
               }
+
+              assert(type);
 
               Value* src =
                 context->registers[std::string(_(Src)->location().view())];
@@ -219,9 +220,10 @@ namespace miniml {
             /**
              * Misc. Operations
              */
+            // Function Call
             T(Instr)
                 << (T(MiscOp)
-                    << (T(FunCall) << T(Ident)[Result] * T(Ident)[Fun] *
+                    << (T(Call) << T(Ident)[Result] * T(Ident)[Fun] *
                           T(Ident)[Param])) >>
               [context](Match& _) -> Node {
               std::string paramId = std::string(_(Param)->location().view());
@@ -230,7 +232,7 @@ namespace miniml {
 
               std::string tmpFuncId = std::string(_(Fun)->location().view());
               std::string funcName = context->functions[tmpFuncId];
-              assert(funcName.empty() == false);
+              assert(!funcName.empty());
 
               Function* function = context->llvm_module.getFunction(funcName);
               assert(function);
@@ -245,10 +247,50 @@ namespace miniml {
               return _(Instr);
             },
 
+            // Compare
+            T(Instr)[Instr]
+                << (T(MiscOp)
+                    << (T(Icmp) << T(Ident)[Ident] * T(Eq, Ult)[Op] *
+                          T(Ti32)[Type] * T(Int, Ident)[Lhs] *
+                          T(Int, Ident)[Rhs])) >>
+              [context](Match& _) -> Node {
+              std::cout << "comparison!!" << std::endl;
+
+              if (_(Type) != Ti32) {
+                return err(_(Type), "Not a valid type for comparison");
+              }
+
+              std::string lhsId = std::string(_(Lhs)->location().view());
+              Value* lhs = context->registers[lhsId];
+              assert(lhs);
+
+              std::string rhsId = std::string(_(Rhs)->location().view());
+              Value* rhs = context->registers[rhsId];
+              assert(rhs);
+
+              std::string resultId = std::string(_(Ident)->location().view());
+
+              Value* result = NULL;
+              if (_(Op) == Eq) {
+                result = context->builder.CreateICmpEQ(lhs, rhs, resultId);
+              } else if (_(Op) == Ult) {
+                result = context->builder.CreateICmpULT(lhs, rhs, resultId);
+              } else {
+                return err(_(Op), "Unknown comparison operator");
+              }
+              assert(result);
+
+              context->registers[resultId] = result;
+              context->result = result;
+
+              return _(Instr);
+            },
+
             /**
              * Meta operations since LLVM IR does not allow assigning a register
              * to another
              */
+            // Copy register value from Src to Dst.
             T(Meta) << (T(RegCpy) << T(Ident)[Dst] * T(Ident)[Src]) >>
               [context](Match& _) -> Node {
               std::string dst = std::string(_(Dst)->location().view());
@@ -261,11 +303,35 @@ namespace miniml {
               return {};
             },
 
+            // Map the temporary id `Ident` to function name `Fun`.
             T(Meta) << (T(FuncMap) << T(Ident)[Ident] * T(Ident)[Fun]) >>
               [context](Match& _) -> Node {
               std::string tmpIdent = std::string(_(Ident)->location().view());
               std::string functionName = std::string(_(Fun)->location().view());
               context->functions[tmpIdent] = functionName;
+
+              // Remove the meta node from the AST.
+              return {};
+            },
+
+            // Map the register `Ident` to Value* `IRValue`.
+            T(Meta)
+                << (T(RegMap) << T(Ident)[Ident] * T(Ti32, Ti1)[Type] *
+                      T(IRValue)[IRValue]) >>
+              [context](Match& _) -> Node {
+              std::string regId = std::string(_(Ident)->location().view());
+              std::string valueStr = std::string(_(IRValue)->location().view());
+
+              Value* value = NULL;
+              if (_(Type) == Ti32) {
+                value = context->builder.getInt32(std::stoi(valueStr));
+              } else if (_(Type) == Ti1) {
+                value = context->builder.getInt1(std::stoi(valueStr));
+              }
+              assert(value);
+
+              context->registers[regId] = value;
+              context->result = value;
 
               // Remove the meta node from the AST.
               return {};
@@ -281,9 +347,10 @@ namespace miniml {
       genExternalFunctions(context);
 
       /**
-       * Internal functions
+       * Internal native functions
        */
-      genPrintFunctions(context);
+      genPrintInt(context);
+      genPrintBool(context);
 
       // Main(void) -> i32
       FunctionType* mainFuncType =
@@ -304,23 +371,28 @@ namespace miniml {
     });
 
     pass.post([context](Node) {
-      // TODO: Add support for last expression being something else than
-      // Integer.
+      Value* result = context->result;
+      assert(result);
 
-      // assert(context->result);
+      llvm::Type* resultType = result->getType();
 
-      Function* printInt = context->llvm_module.getFunction("printInt");
+      Function* printFun = NULL;
+      if (resultType == context->builder.getInt1Ty()) {
+        printFun = context->llvm_module.getFunction("printBool");
+      } else if (resultType == context->builder.getInt32Ty()) {
+        printFun = context->llvm_module.getFunction("printInt");
+      } else {
+        // TODO: Error! Printtype not implemented!
+      }
+      assert(printFun);
 
-      assert(printInt);
-
-      context->builder.CreateCall(printInt, {context->builder.getInt32(42)});
+      context->builder.CreateCall(printFun, {context->result});
 
       // Return 0 to indicate success.
       context->builder.CreateRet(context->builder.getInt32(0));
 
       Function* main = context->llvm_module.getFunction("main");
       verifyFunction(*main, &llvm::errs());
-
       verifyModule(context->llvm_module, &llvm::errs());
 
       // FIXME: Temporarily write generated LLVM IR to file so can be compiled
@@ -335,6 +407,10 @@ namespace miniml {
     return pass;
   }
 
+  /**
+   * Generates imports of external functions needed for LLVM IR generation.
+   * @param context LLVM IR context
+   */
   void genExternalFunctions(std::shared_ptr<LLVMIRContext> context) {
     // printf(char*) -> i32
     FunctionType* printfFunctionType = FunctionType::get(
@@ -344,7 +420,11 @@ namespace miniml {
     context->llvm_module.getOrInsertFunction("printf", printfFunctionType);
   }
 
-  void genPrintFunctions(std::shared_ptr<LLVMIRContext> context) {
+  /**
+   * Generates a function that prints an integer value.
+   * @param context LLVM IR context
+   */
+  void genPrintInt(std::shared_ptr<LLVMIRContext> context) {
     // Formatstring needed to make calls to printf
     auto formatStrInt = context->builder.CreateGlobalStringPtr(
       "%d\n", "formatStrInt", 0, &context->llvm_module);
@@ -374,6 +454,45 @@ namespace miniml {
     context->builder.CreateRet(arg);
 
     verifyFunction(*printInt, &llvm::errs());
+  }
+  /**
+   * Generates a function that prints a boolean value.
+   * @param context LLVM IR context
+   */
+  void genPrintBool(std::shared_ptr<LLVMIRContext> context) {
+    // String needed to make calls to printf
+    auto strBoolTrue = context->builder.CreateGlobalStringPtr(
+      "true\n", "strBoolTrue", 0, &context->llvm_module);
+    auto strBoolFalse = context->builder.CreateGlobalStringPtr(
+      "false\n", "strBoolFalse", 0, &context->llvm_module);
+
+    // printInt(i1) -> i1
+    FunctionType* printBoolType = FunctionType::get(
+      context->builder.getInt1Ty(), {context->builder.getInt1Ty()}, false);
+
+    Function* printBool = Function::Create(
+      printBoolType,
+      Function::LinkageTypes::ExternalLinkage,
+      "printBool",
+      context->llvm_module);
+
+    printBool->setCallingConv(CallingConv::C);
+
+    BasicBlock* printBoolBody =
+      BasicBlock::Create(context->llvm_context, "printBoolBody", printBool);
+    context->builder.SetInsertPoint(printBoolBody);
+
+    Argument* arg = printBool->arg_begin();
+    arg->setName("boolToPrint");
+
+    Function* printfFunc = context->llvm_module.getFunction("printf");
+    context->builder.CreateCall(
+      printfFunc,
+      {context->builder.CreateSelect(arg, strBoolTrue, strBoolFalse)});
+
+    context->builder.CreateRet(arg);
+
+    verifyFunction(*printBool, &llvm::errs());
   }
 
 }

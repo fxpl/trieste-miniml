@@ -78,7 +78,7 @@ namespace miniml {
         },
 
         /**
-         * Compile Let.
+         * Let
          */
         T(Compile) << T(Ident)[Ident] *
               (T(Let)[Let] << T(Ident)[Dst] * T(Type)[Type] * T(Expr)[Expr]) >>
@@ -114,7 +114,26 @@ namespace miniml {
         },
 
         /**
-         * Compile single integer.
+         * Boolean
+         */
+        T(Compile) << T(Ident)[Ident] *
+              (T(Expr) << (T(Type) << T(TBool)[Type]) *
+                 T(True, False)[IRValue]) >>
+          [](Match& _) -> Node {
+          Node value = NULL;
+          if (_(IRValue) == True) {
+            value = IRValue ^ "1";
+          } else if (_(IRValue) == False) {
+            value = IRValue ^ "0";
+          }
+
+          assert(value);
+
+          return Meta << (RegMap << _(Ident) << Ti1 << value);
+        },
+
+        /**
+         * Integer
          */
         T(Compile) << T(Ident)[Ident] *
               (T(Expr) << (T(Type)[Type] << T(TInt)) * T(Int)[Int]) >>
@@ -126,7 +145,7 @@ namespace miniml {
         },
 
         /**
-         * Compile single identifier.
+         * Identifier
          */
         T(Compile) << T(Ident)[Dst] * (T(Expr) << T(Type) * T(Ident)[Src]) >>
           [](Match& _) -> Node {
@@ -137,7 +156,7 @@ namespace miniml {
         },
 
         /**
-         * Compile binary operation.
+         * Binary operation.
          */
         T(Compile) << T(Ident)[Ident] *
               (T(Expr) << (T(Type)[Type] << T(TInt)) *
@@ -185,6 +204,48 @@ namespace miniml {
         },
 
         /**
+         * Comparison
+         */
+        T(Compile) << T(Ident)[Ident] *
+              (T(Expr) << (T(Type) << T(TBool)) *
+                 (T(Equals, LT)[Op] << T(Expr)[Lhs] * T(Expr)[Rhs])) >>
+          [](Match& _) -> Node {
+
+          if ((_(Lhs)/Type/Type)->type() != (_(Rhs)/Type/Type)->type()) {
+            return err(_(Op), "comparison operands have different types");
+          }
+          
+          Node type = _(Lhs)/Type/Type;
+          Node llvmType = NULL;
+          if (type == TInt) {
+            llvmType = Ti32;
+          } else {
+            return err(_(Lhs)/Type, "comparison type not supported");
+          }
+
+          Node op = NULL;
+          // TODO: Fix compare
+          if (_(Op) == Equals) {
+            op = Eq;
+          } else if (_(Op) == LT) {
+            op = Ult;
+          } else {
+            // TODO: Return error
+          }
+
+          Node lhsIdent = Ident ^ _(Lhs)->fresh();
+          Node rhsIdent = Ident ^ _(Rhs)->fresh();
+
+          return Reapply << (Compile << lhsIdent->clone() << _(Lhs))
+                         << (Compile << rhsIdent->clone() << _(Rhs))
+                         << (Lift << Top
+                                  << (Instr
+                                      << (MiscOp
+                                          << (Icmp << _(Ident) << op << llvmType
+                                                   << lhsIdent << rhsIdent))));
+        },
+
+        /**
          * Apply
          */
         T(Compile) << T(Ident)[Ident] *
@@ -199,8 +260,8 @@ namespace miniml {
                          << (Lift << Top
                                   << (Instr
                                       << (MiscOp
-                                          << (FunCall << _(Ident) << funIdent
-                                                      << argIdent))));
+                                          << (Call << _(Ident) << funIdent
+                                                   << argIdent))));
         },
 
         /**
@@ -209,12 +270,13 @@ namespace miniml {
         T(Compile) << T(Ident)[Ident] *
               (T(Expr) << (T(Type) << T(TypeArrow)[TypeArrow]) * T(Print)) >>
           [](Match& _) -> Node {
-
           Node funcName = NULL;
           if ((_(TypeArrow) / Ty1 == TInt) && (_(TypeArrow) / Ty2 == TInt)) {
             funcName = Ident ^ "printInt";
-          } // else if ()
-          // TODO: Support print for other types.
+          } else if (
+            (_(TypeArrow) / Ty1 == TBool) && (_(TypeArrow) / Ty2 == TBool)) {
+            funcName = Ident ^ "printBool";
+          }
 
           if (!funcName) {
             return err(_(TypeArrow), "print function with this type not found");

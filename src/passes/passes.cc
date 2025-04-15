@@ -1,4 +1,5 @@
 // TODO: Try to not include all the passes here
+// clang-format off
 #include "../init_parse.cc"
 #include "parse/parse_cleanup.cc"
 #include "parse/fun.cc"
@@ -17,15 +18,15 @@
 
 #include "llvm-ir/compile.cc"
 #include "llvm-ir/llvmIR.cc"
+// clang-format on
 
+namespace miniml {
 
-namespace miniml{
+  Parse parser() {
+    return init_parse::parser();
+  }
 
-Parse parser(){
-  return init_parse::parser();
-}
-
-std::vector<Pass> passes(){
+  std::vector<Pass> passes() {
     return {
       // Parsing
       parse_cleanup(),
@@ -52,5 +53,5 @@ std::vector<Pass> passes(){
       compile(),
       generateLLVMIR(),
     };
-    }
+  }
 }

@@ -1,12 +1,12 @@
 #pragma once
 #include <trieste/trieste.h>
 
-namespace miniml
-{
+namespace miniml {
   using namespace trieste;
 
   // Program
-  inline const auto Program = TokenDef("program", flag::symtab | flag::defbeforeuse);
+  inline const auto Program =
+    TokenDef("program", flag::symtab | flag::defbeforeuse);
   // Declarations
   inline const auto Let = TokenDef("let", flag::lookup);
 
@@ -20,7 +20,7 @@ namespace miniml
   // Constructed types
   inline const auto TVars = TokenDef("t_vars");
   inline const auto ForAllTy = TokenDef("forall");
-  //Constraints
+  // Constraints
   inline const auto EqConstr = TokenDef("eq_constraint");
   inline const auto InstConstr = TokenDef("inst_constraint");
   inline const auto GenConstr = TokenDef("gen_constraint");
@@ -36,7 +36,7 @@ namespace miniml
   inline const auto True = TokenDef("true");
   inline const auto False = TokenDef("false");
 
-   // Arithmetic operators
+  // Arithmetic operators
 
   inline const auto Add = TokenDef("+");
   inline const auto Sub = TokenDef("-");
@@ -47,11 +47,12 @@ namespace miniml
   inline const auto Equals = TokenDef("=");
 
   // Functions
-  inline const auto Fun  = TokenDef("fun", flag::symtab); //binds its argument to its symtab
+  inline const auto Fun =
+    TokenDef("fun", flag::symtab); // binds its argument to its symtab
   inline const auto FunDef = TokenDef("fundef", flag::lookup | flag::shadowing);
   inline const auto Param = TokenDef("param", flag::lookup | flag::shadowing);
   inline const auto Annotation = TokenDef("t_annotation");
-  inline const auto Is  = TokenDef("is");
+  inline const auto Is = TokenDef("is");
 
   // Conditionals
   inline const auto If = TokenDef("if");
@@ -66,7 +67,8 @@ namespace miniml
   inline const auto Print = TokenDef("print");
 
   // Grouping tokens
-  inline const auto TopExpr = TokenDef("topexpr"); // expressions/let decl at top level
+  inline const auto TopExpr =
+    TokenDef("topexpr"); // expressions/let decl at top level
   inline const auto Expr = TokenDef("expr");
   inline const auto App = TokenDef("app"); // function application
 
@@ -96,24 +98,24 @@ namespace miniml
   inline const auto Instr = TokenDef("instr");
   inline const auto BinaryOp = TokenDef("binary_op");
   inline const auto TerminatorOp = TokenDef("terminator_op");
-  
+
   // MemoryOps
   inline const auto MemoryOp = TokenDef("memory_op");
   inline const auto Alloca = TokenDef("alloca");
   inline const auto Load = TokenDef("load");
   inline const auto Store = TokenDef("store");
-  
+
   // MiscOps
   inline const auto MiscOp = TokenDef("misc_op");
   inline const auto Call = TokenDef("call");
   inline const auto Icmp = TokenDef("icmp");
-  
+
   // Meta operations (Not apart of LLVM IR)
   inline const auto Meta = TokenDef("meta");
   inline const auto RegCpy = TokenDef("reg_cpy");
   inline const auto RegMap = TokenDef("reg_map");
   inline const auto FuncMap = TokenDef("func_map");
-  
+
   // Helpers
   inline const auto Global = TokenDef("global");
   inline const auto IRValue = TokenDef("value");

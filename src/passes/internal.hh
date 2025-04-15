@@ -206,13 +206,33 @@ namespace miniml{
     | (TVars <<= TVar++)
     ;
 
+    
+
+    // eq: equal
+    // ne: not equal
+    // ugt: unsigned greater than
+    // uge: unsigned greater or equal
+    // ult: unsigned less than
+    // ule: unsigned less or equal
+    // sgt: signed greater than
+    // sge: signed greater or equal
+    // slt: signed less than
+    // sle: signed less or equal
+    // Unsigned
+    inline const auto wf_comparison = (Eq | Ne | Ugt | Uge | Ult | Ule | Sgt | Sge | Slt | Sle);
+    inline const auto wf_llvm_types = (Ti1 | Ti32); 
+
     inline const auto wf_operand = (Int | Ident);
     
     inline const auto wf =
     (Top <<= (Instr | Meta)++)
     // Meta operations to handle LLVM IR limitations.
-    | (Meta <<= (RegCpy | FuncMap))
+    | (Meta <<= (RegCpy | RegMap | FuncMap))
+      // RegCpy copy the value from Src to Dst.
       | (RegCpy <<= (Dst >>= Ident) * (Src >>= Ident))
+      // Map a value to a register identifier.
+      | (RegMap <<= Ident * (Type >>= Ti32 | Ti1) * IRValue)
+      // Map the temporary id `Ident` to function name `Fun`.
       | (FuncMap <<= Ident * (Fun >>= Ident))
     // Real wf begins
     | (Instr <<= (BinaryOp | MemoryOp | TerminatorOp | MiscOp))
@@ -224,8 +244,9 @@ namespace miniml{
       | (Alloca <<= (Result >>= Ident) * Type)
       | (Load <<= (Result >>= Ident) * Type * (Src >>= Ident))
       | (Store <<= (IRValue >>= Ident) * (Dst >>= Ident))
-    | (MiscOp <<= (FunCall))
-      | (FunCall <<= (Result >>= Ident) * (Fun >>= Ident) * (Param >>= Ident))
+    | (MiscOp <<= (Call | Icmp))
+      | (Call <<= (Result >>= Ident) * (Fun >>= Ident) * (Param >>= Ident))
+      | (Icmp <<= (Result >>= Ident) * (Comp >>= wf_comparison) * (Type >>= wf_llvm_types) * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
     | (Type <<= (Type >>= wf_types | ForAllTy)) // From frontend
     ;
   }

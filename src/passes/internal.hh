@@ -1,4 +1,5 @@
 #pragma once
+// clang-format off
 #include "../miniml-lang.hh"
 
 namespace miniml{
@@ -264,3 +265,4 @@ namespace miniml{
       
     }
 }
+// clang-format on

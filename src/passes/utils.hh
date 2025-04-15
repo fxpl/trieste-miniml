@@ -16,7 +16,7 @@ namespace miniml
 
   Node err(Node node, const std::string &msg);
 
-    std::string node_val(Node node);
+  std::string node_val(Node node);
 
   Node get_type(Node n);
 

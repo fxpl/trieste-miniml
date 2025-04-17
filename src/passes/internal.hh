@@ -221,35 +221,45 @@ namespace miniml{
     // slt: signed less than
     // sle: signed less or equal
     // Unsigned
-    inline const auto wf_comparison = (Eq | Ne | Ugt | Uge | Ult | Ule | Sgt | Sge | Slt | Sle);
+    inline const auto wf_comparison = (EQ | NE | UGT | UGE | ULT | ULE | SGT | SGE | SLT | SLE);
     inline const auto wf_llvm_types = (Ti1 | Ti32); 
 
     inline const auto wf_operand = (Int | Ident);
     
     inline const auto wf =
-    (Top <<= (Instr | Meta)++)
+    (Top <<= (Instr | Label | Meta)++)
     // Meta operations to handle LLVM IR limitations.
-    | (Meta <<= (RegCpy | RegMap | FuncMap))
+    | (Meta <<= (RegCpy | RegMap | FuncMap | BlockMap))
       // RegCpy copy the value from Src to Dst.
       | (RegCpy <<= (Dst >>= Ident) * (Src >>= Ident))
-      // Map a value to a register identifier.
+      // Create a new value.
       | (RegMap <<= Ident * (Type >>= Ti32 | Ti1) * IRValue)
+      // Create a new block.
+      | (BlockMap <<= Ident)
       // Map the temporary id `Ident` to function name `Fun`.
       | (FuncMap <<= Ident * (Fun >>= Ident))
-    // Real wf begins
+    // Real wf begins.
     | (Instr <<= (BinaryOp | MemoryOp | TerminatorOp | MiscOp))
     | (BinaryOp <<= (Add | Sub | Mul))
       | (Add <<= (Result >>= Ident) * Type * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
       | (Sub <<= (Result >>= Ident) * Type * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
       | (Mul <<= (Result >>= Ident) * Type * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
     | (MemoryOp <<= (Alloca | Load | Store))
-      | (Alloca <<= (Result >>= Ident) * Type)
-      | (Load <<= (Result >>= Ident) * Type * (Src >>= Ident))
+      | (Alloca <<= (Result >>= Ident) * (Type >>= wf_llvm_types))
+      | (Load <<= (Result >>= Ident) * (Type >>= wf_llvm_types) * (Src >>= Ident))
       | (Store <<= (IRValue >>= Ident) * (Dst >>= Ident))
-    | (MiscOp <<= (Call | Icmp))
+    | (MiscOp <<= (Call | Icmp | Phi))
       | (Call <<= (Result >>= Ident) * (Fun >>= Ident) * (Param >>= Ident))
       | (Icmp <<= (Result >>= Ident) * (Op >>= wf_comparison) * (Type >>= wf_llvm_types) * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
-    // TODO: From frontend, should be replaced by LLVM tokens.
+      | (Phi <<= (Result >>= Ident) * (Type >>= wf_llvm_types) * Predecessor)
+        // TODO: Can probably organise better.
+        | (Predecessor <<= Prev++)
+          | (Prev <<= (IRValue >>= Ident) * (Label >>= Ident))
+    | (TerminatorOp <<= (Branch | Jump))
+      | (Branch <<= (Cond >>= Ident) * (True >>= Ident) * (False >>= Ident))
+      | (Jump <<= (Label >>= Ident))
+      // TODO: From frontend, should be replaced by LLVM tokens.
+    | (Label <<= Ident) 
     | (Type <<= (Type >>= wf_types | ForAllTy)) 
     ;
   }

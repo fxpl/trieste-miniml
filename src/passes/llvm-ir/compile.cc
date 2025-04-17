@@ -81,7 +81,8 @@ namespace miniml {
          * Let
          */
         T(Compile) << T(Ident)[Ident] *
-              (T(Let)[Let] << T(Ident)[Dst] * T(Type)[Type] * T(Expr)[Expr]) >>
+              (T(Let)[Let] << T(Ident)[Dst] * (T(Type) << (T(ForAllTy)[Type])) *
+                 T(Expr)[Expr]) >>
           [](Match& _) -> Node {
           // TODO: Let now stores it on the stack and then loads it into a
           // register. Should probably just store it and use another token as
@@ -89,26 +90,37 @@ namespace miniml {
 
           Node tmpPtr = Ident ^ _(Let)->fresh();
 
-          // TODO: Need to deal with ForAllTy. Until I figure out how, use
-          // hardcoded type.
-          // FIXME: Let cannot be used for booleans.
-          Node hardcodedType = (Type << TInt);
+          // TODO: Need to deal with ForAllTy. Until I figure out how, just
+          // pretend it cannot be nested and ignore it.
+          Node type = get_type(_(Type));
+
+          // FIXME: I'm seemingly writning Type handling in every rule. Maybe it
+          // should be a separate pass somehow?
+          Node llvmType = NULL;
+          if (type == TBool) {
+            llvmType = Ti1;
+          } else if (type == TInt) {
+            llvmType = Ti32;
+          } else {
+            return err(_(Type), "let type not supported");
+          }
 
           return Reapply
-            << (Compile << _(Dst) << _(Expr))
-            // Then copy it into _(Ident) so [[_]]ident still true.
             << (Lift << Top
                      << (Instr
-                         << (MemoryOp << (Alloca << tmpPtr << hardcodedType))))
+                         << (MemoryOp
+                             << (Alloca << tmpPtr->clone()
+                                        << llvmType->clone()))))
+            << (Compile << _(Dst) << _(Expr))
             << (Lift << Top
                      << (Instr
                          << (MemoryOp
                              << (Store << _(Dst)->clone() << tmpPtr->clone()))))
+            // Then copy it into _(Ident) so [[_]]ident is correct.
             << (Lift << Top
                      << (Instr
                          << (MemoryOp
-                             << (Load << _(Ident) << hardcodedType->clone()
-                                      << tmpPtr->clone()))));
+                             << (Load << _(Ident) << llvmType << tmpPtr))));
         },
 
         /**
@@ -204,9 +216,9 @@ namespace miniml {
 
           Node op = NULL;
           if (_(Op) == Equals) {
-            op = Eq;
+            op = EQ;
           } else if (_(Op) == LT) {
-            op = Ult;
+            op = ULT;
           } else {
             return err(_(Op), "comparison operator not supported");
           }
@@ -221,6 +233,121 @@ namespace miniml {
                                       << (MiscOp
                                           << (Icmp << _(Ident) << op << llvmType
                                                    << lhsIdent << rhsIdent))));
+        },
+
+        // (top
+        //   {}
+        //   (program
+        //     {}
+        //     (topexpr
+        //       (let
+        //         (ident 1:a)
+        //         (type
+        //           (forall
+        //             (t_vars)
+        //             (type
+        //               (t_int))))
+        //         (expr
+        //           (type
+        //             (t_int))
+        //           (if
+        //             (expr
+        //               (type
+        //                 (t_bool))
+        //               (<
+        //                 (expr
+        //                   (type
+        //                     (t_int))
+        //                   (int 1:2))
+        //                 (expr
+        //                   (type
+        //                     (t_int))
+        //                   (int 1:3))))
+        //             (expr
+        //               (type
+        //                 (t_int))
+        //               (int 1:4))
+        //             (expr
+        //               (type
+        //                 (t_int))
+        //               (int 1:5))))))
+        //     (topexpr
+        //       (expr
+        //         (type
+        //           (t_int))
+        //         (ident 1:a)))))
+
+        /**
+         * If-then-else
+         */
+        T(Compile) << T(Ident)[Ident] *
+              (T(Expr) << T(Type)[Type] *
+                 (T(If) << T(Expr)[Cond] * T(Expr)[True] * T(Expr)[False])) >>
+          [](Match& _) -> Node {
+          Node type = _(Type) / Type;
+          Node llvmType = NULL;
+          if (type == TInt) {
+            llvmType = Ti32;
+          } else if (type != TBool) {
+            llvmType = Ti1;
+          } else {
+            return err(_(Type), "if-then-else type not supported");
+          }
+          assert(llvmType);
+
+          Node condId = Ident ^ _(Cond)->fresh();
+          Node ifTrueId = Ident ^ _(True)->fresh();
+          Node ifFalseId = Ident ^ _(False)->fresh();
+
+          // FIXME: concat for debug of code
+          Node ifTrueLabel =
+            Ident ^ ("ifthen" + std::string(_(True)->fresh().view()));
+          Node ifFalseLabel =
+            Ident ^ ("ifelse" + std::string(_(False)->fresh().view()));
+          Node ifEndLabel =
+            Ident ^ ("ifend" + std::string(_(Cond)->fresh().view()));
+
+          return Reapply
+            << (Compile << condId << _(Cond))
+            // Generate blocks/labels
+            << (Lift << Top << (Meta << (BlockMap << ifTrueLabel)))
+            << (Lift << Top << (Meta << (BlockMap << ifFalseLabel)))
+            << (Lift << Top << (Meta << (BlockMap << ifEndLabel)))
+            // TODO: Branch instruction here
+            << (Lift << Top
+                     << (Instr
+                         << (TerminatorOp
+                             << (Branch << condId->clone()
+                                        << ifTrueLabel->clone()
+                                        << ifFalseLabel->clone()))))
+            // Then block
+            << (Lift << Top << (Label << ifTrueLabel->clone()))
+            << (Compile << ifTrueId << _(True))
+            << (Lift << Top
+                     << (Instr
+                         << (TerminatorOp << (Jump << ifEndLabel->clone()))))
+            // Else block
+            << (Lift << Top << (Label << ifFalseLabel->clone()))
+            << (Compile << ifFalseId << _(False))
+            << (Lift << Top
+                     << (Instr
+                         << (TerminatorOp << (Jump << ifEndLabel->clone()))))
+            // End block
+            << (Lift << Top << (Label << ifEndLabel->clone()))
+            << (Lift << Top
+                     << (Instr
+                         << (MiscOp
+                             << (Phi
+                                 << _(Ident) << llvmType
+                                 << (Predecessor
+                                     << (Prev << ifTrueId->clone()
+                                              << ifTrueLabel->clone())
+                                     << (Prev << ifFalseId->clone()
+                                              << ifFalseLabel->clone()))))));
+          // FIXME: Not sure how to do this. alloca?
+          // Then what should _(Ident) refer to?
+          // FIXME: _(Ident) needs to map to either the true or false branch,
+          // depends on cond. Phi instruction?
         },
 
         /**
@@ -249,8 +376,6 @@ namespace miniml {
               (T(Expr) << (T(Type) << T(TypeArrow)[TypeArrow]) * T(Print)) >>
           [](Match& _) -> Node {
           Node funcName = NULL;
-          std::cout << (_(TypeArrow) / Ty1)->type() << std::endl;
-          
           if ((_(TypeArrow) / Ty1)->type() != (_(TypeArrow) / Ty2)->type()) {
             return err(_(TypeArrow), "print is an identity function");
           }

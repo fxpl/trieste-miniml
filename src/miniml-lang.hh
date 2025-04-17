@@ -96,49 +96,60 @@ namespace miniml {
   inline const auto Compile = TokenDef("compile");
 
   inline const auto Instr = TokenDef("instr");
-  inline const auto BinaryOp = TokenDef("binary_op");
-  inline const auto TerminatorOp = TokenDef("terminator_op");
+  inline const auto BlockMap = TokenDef("block_map");
+  inline const auto Label = TokenDef("label");
 
+  // BinaryOps
+  inline const auto BinaryOp = TokenDef("binary_op");
+  
   // MemoryOps
   inline const auto MemoryOp = TokenDef("memory_op");
   inline const auto Alloca = TokenDef("alloca");
   inline const auto Load = TokenDef("load");
   inline const auto Store = TokenDef("store");
 
+  // TerminatorOps
+  inline const auto TerminatorOp = TokenDef("terminator_op");
+  inline const auto Branch = TokenDef("branch");
+  inline const auto Jump = TokenDef("jump");
+
   // MiscOps
   inline const auto MiscOp = TokenDef("misc_op");
   inline const auto Call = TokenDef("call");
   inline const auto Icmp = TokenDef("icmp");
+  inline const auto Phi = TokenDef("phi");
 
   // Meta operations (Not apart of LLVM IR)
   inline const auto Meta = TokenDef("meta");
   inline const auto RegCpy = TokenDef("reg_cpy");
   inline const auto RegMap = TokenDef("reg_map");
   inline const auto FuncMap = TokenDef("func_map");
-
-  // Helpers
-  inline const auto Global = TokenDef("global");
-  inline const auto IRValue = TokenDef("value");
-  inline const auto Src = TokenDef("src");
-  inline const auto Dst = TokenDef("dst");
-  inline const auto Result = TokenDef("result");
-
+  
   // LLVM IR Types
   inline const auto Ti32 = TokenDef("i32");
   inline const auto Ti1 = TokenDef("i1");
 
   // Comparison operations
   inline const auto Comp = TokenDef("comp");
-  inline const auto Eq = TokenDef("eq");
-  inline const auto Ne = TokenDef("ne");
+  inline const auto EQ = TokenDef("eq");
+  inline const auto NE = TokenDef("ne");
   // Unsigned
-  inline const auto Ugt = TokenDef("ugt");
-  inline const auto Uge = TokenDef("uge");
-  inline const auto Ult = TokenDef("ult");
-  inline const auto Ule = TokenDef("ule");
+  inline const auto UGT = TokenDef("ugt");
+  inline const auto UGE = TokenDef("uge");
+  inline const auto ULT = TokenDef("ult");
+  inline const auto ULE = TokenDef("ule");
   // Signed
-  inline const auto Sgt = TokenDef("sgt");
-  inline const auto Sge = TokenDef("sge");
-  inline const auto Slt = TokenDef("slt");
-  inline const auto Sle = TokenDef("sle");
+  inline const auto SGT = TokenDef("sgt");
+  inline const auto SGE = TokenDef("sge");
+  inline const auto SLT = TokenDef("slt");
+  inline const auto SLE = TokenDef("sle");
+  
+  // Helpers
+  inline const auto Predecessor = TokenDef("predecessor");
+  inline const auto Prev = TokenDef("prev");
+  inline const auto Global = TokenDef("global");
+  inline const auto IRValue = TokenDef("value", flag::print);
+  inline const auto Src = TokenDef("src");
+  inline const auto Dst = TokenDef("dst");
+  inline const auto Result = TokenDef("result");
 }

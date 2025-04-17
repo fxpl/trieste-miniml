@@ -46,6 +46,9 @@ namespace miniml {
     // Maps temporary identifiers to actual function names.
     std::map<std::string, std::string> functions;
 
+    // Maps temporary identifiers basic blocks.
+    std::map<std::string, llvm::BasicBlock*> basicBlocks;
+
     LLVMIRContext()
     : builder(llvm_context), llvm_module("miniML", llvm_context) {}
 
@@ -82,7 +85,7 @@ namespace miniml {
         {
           "generateLLVMIR",
           LLVMIRGeneration::wf,
-          dir::bottomup | dir::once,
+          dir::topdown | dir::once,
           {
             /**
              * Binary Operations
@@ -126,21 +129,20 @@ namespace miniml {
             // Alloca
             T(Instr)[Instr]
                 << (T(MemoryOp)
-                    << (T(Alloca)
-                        << T(Ident)[Ident] * (T(Type) << T(TInt)[Type]))) >>
+                    << (T(Alloca) << T(Ident)[Ident] * (T(Ti32, Ti1)[Type]))) >>
               [context](Match& _) -> Node {
               std::string resultId = node_val(_(Ident));
 
-              llvm::Type* type = NULL;
-              if (_(Type)->type() == TInt) {
-                type = context->builder.getInt32Ty();
-              } else {
-                return err(
-                  _(Type), "Type not supported for alloca instruction");
+              llvm::Type* llvmType = NULL;
+              if (_(Type) == Ti32) {
+                llvmType = context->builder.getInt32Ty();
+              } else if (_(Type) == Ti1) {
+                llvmType = context->builder.getInt1Ty();
               }
+              assert(llvmType);
 
               AllocaInst* result =
-                context->builder.CreateAlloca(type, nullptr, resultId);
+                context->builder.CreateAlloca(llvmType, nullptr, resultId);
 
               context->registers[resultId] = result;
               context->result = result;
@@ -153,9 +155,15 @@ namespace miniml {
                 << (T(MemoryOp)
                     << (T(Store) << T(Ident)[IRValue] * T(Ident)[Dst])) >>
               [context](Match& _) -> Node {
-              Value* value = context->registers[node_val(_(IRValue))];
-              Value* dst = context->registers[node_val(_(Dst))];
-              context->builder.CreateStore(value, dst);
+              std::string valueId = node_val(_(IRValue));
+              Value* value = context->registers[valueId];
+              assert(value);
+
+              std::string destId = node_val(_(Dst));
+              Value* dest = context->registers[destId];
+              assert(dest);
+
+              context->builder.CreateStore(value, dest);
 
               return _(Instr);
             },
@@ -164,14 +172,16 @@ namespace miniml {
             T(Instr)[Instr]
                 << (T(MemoryOp)
                     << (T(Load) << T(Ident)[Ident] *
-                          (T(Type) << T(TInt)[Type]) * T(Ident)[Src])) >>
+                          T(Ti32, Ti1)[Type] * T(Ident)[Src])) >>
               [context](Match& _) -> Node {
               // TODO: Handle other types
               std::string resultId = node_val(_(Ident));
 
               llvm::Type* type = NULL;
-              if (_(Type)->type() == TInt) {
+              if (_(Type) == Ti32) {
                 type = context->builder.getInt32Ty();
+              } else if (_(Type) == Ti1) {
+                type = context->builder.getInt1Ty();
               }
               assert(type);
 
@@ -219,12 +229,10 @@ namespace miniml {
             // Compare
             T(Instr)[Instr]
                 << (T(MiscOp)
-                    << (T(Icmp) << T(Ident)[Ident] * T(Eq, Ult)[Op] *
+                    << (T(Icmp) << T(Ident)[Ident] * T(EQ, ULT)[Op] *
                           T(Ti32)[Type] * T(Int, Ident)[Lhs] *
                           T(Int, Ident)[Rhs])) >>
               [context](Match& _) -> Node {
-              std::cout << "comparison!!" << std::endl;
-
               if (_(Type) != Ti32) {
                 return err(_(Type), "Not a valid type for comparison");
               }
@@ -240,9 +248,9 @@ namespace miniml {
               std::string resultId = node_val(_(Ident));
 
               Value* result = NULL;
-              if (_(Op) == Eq) {
+              if (_(Op) == EQ) {
                 result = context->builder.CreateICmpEQ(lhs, rhs, resultId);
-              } else if (_(Op) == Ult) {
+              } else if (_(Op) == ULT) {
                 result = context->builder.CreateICmpULT(lhs, rhs, resultId);
               } else {
                 return err(_(Op), "Unknown comparison operator");
@@ -251,6 +259,98 @@ namespace miniml {
 
               context->registers[resultId] = result;
               context->result = result;
+
+              return _(Instr);
+            },
+
+            // Phi
+            T(Instr)[Instr]
+                << (T(MiscOp)
+                    << (T(Phi) << T(Ident)[Ident] * T(Ti32, Ti1)[Type] *
+                          (T(Predecessor)
+                           << T(Prev)[True] * T(Prev)[False]))) >>
+              [context](Match& _) -> Node {
+              llvm::Type* type = NULL;
+              if (_(Type) == Ti32) {
+                type = context->builder.getInt32Ty();
+              } else if (_(Type) == Ti1) {
+                type = context->builder.getInt1Ty();
+              }
+              assert(type);
+
+              std::string ifTrueId = node_val(_(True) / IRValue);
+              Value* trueVal = context->registers[ifTrueId];
+              assert(trueVal);
+
+              std::string trueLabel = node_val(_(True) / Label);
+              BasicBlock* trueBlock = context->basicBlocks[trueLabel];
+              assert(trueBlock);
+
+              std::string falseId = node_val(_(False) / IRValue);
+              Value* falseVal = context->registers[falseId];
+              assert(falseVal);
+
+              std::string falseLabel = node_val(_(False) / Label);
+              BasicBlock* falseBlock = context->basicBlocks[falseLabel];
+              assert(falseBlock);
+
+              std::string resultId = node_val(_(Ident));
+              PHINode* phi = context->builder.CreatePHI(type, 2, resultId);
+              phi->addIncoming(trueVal, trueBlock);
+              phi->addIncoming(falseVal, falseBlock);
+
+              context->registers[resultId] = phi;
+              context->result = phi;
+
+              return _(Instr);
+            },
+
+            // Label
+            T(Label) << T(Ident)[Ident] >> [context](Match& _) -> Node {
+              std::string blockId = node_val(_(Ident));
+              llvm::BasicBlock* block = context->basicBlocks[blockId];
+              assert(block);
+
+              context->builder.SetInsertPoint(block);
+
+              return _(Label);
+            },
+
+            /**
+             * Terminating Operations.
+             */
+            // Branch
+            T(Instr)[Instr]
+                << (T(TerminatorOp)
+                    << (T(Branch) << T(Ident)[Cond] * T(Ident)[True] *
+                          T(Ident)[False])) >>
+              [context](Match& _) -> Node {
+              std::string condId = node_val(_(Cond));
+              Value* cond = context->registers[condId];
+              assert(cond);
+
+              std::string trueId = node_val(_(True));
+              llvm::BasicBlock* trueBlock = context->basicBlocks[trueId];
+              assert(trueBlock);
+
+              std::string falseId = node_val(_(False));
+              llvm::BasicBlock* falseBlock = context->basicBlocks[falseId];
+              assert(falseBlock);
+
+              context->builder.CreateCondBr(cond, trueBlock, falseBlock);
+
+              return _(Instr);
+            },
+
+            // Jump
+            T(Instr)[Instr]
+                << (T(TerminatorOp) << (T(Jump) << T(Ident)[Label])) >>
+              [context](Match& _) -> Node {
+              std::string blockId = node_val(_(Label));
+              llvm::BasicBlock* block = context->basicBlocks[blockId];
+              assert(block);
+
+              context->builder.CreateBr(block);
 
               return _(Instr);
             },
@@ -301,6 +401,22 @@ namespace miniml {
 
               context->registers[regId] = value;
               context->result = value;
+
+              // Remove the meta node from the AST.
+              return {};
+            },
+
+            // Create Basic Block
+            T(Meta) << (T(BlockMap) << T(Ident)[Ident]) >>
+              [context](Match& _) -> Node {
+              std::string blockId = node_val(_(Ident));
+
+              // TODO: How to keep track of parent when this is in the body of a
+              // function!?
+              BasicBlock* block = BasicBlock::Create(
+                context->llvm_context, blockId, context->mainFunction);
+
+              context->basicBlocks[blockId] = block;
 
               // Remove the meta node from the AST.
               return {};

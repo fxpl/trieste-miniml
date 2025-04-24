@@ -235,48 +235,6 @@ namespace miniml {
                                                    << lhsIdent << rhsIdent))));
         },
 
-        // (top
-        //   {}
-        //   (program
-        //     {}
-        //     (topexpr
-        //       (let
-        //         (ident 1:a)
-        //         (type
-        //           (forall
-        //             (t_vars)
-        //             (type
-        //               (t_int))))
-        //         (expr
-        //           (type
-        //             (t_int))
-        //           (if
-        //             (expr
-        //               (type
-        //                 (t_bool))
-        //               (<
-        //                 (expr
-        //                   (type
-        //                     (t_int))
-        //                   (int 1:2))
-        //                 (expr
-        //                   (type
-        //                     (t_int))
-        //                   (int 1:3))))
-        //             (expr
-        //               (type
-        //                 (t_int))
-        //               (int 1:4))
-        //             (expr
-        //               (type
-        //                 (t_int))
-        //               (int 1:5))))))
-        //     (topexpr
-        //       (expr
-        //         (type
-        //           (t_int))
-        //         (ident 1:a)))))
-
         /**
          * If-then-else
          */
@@ -288,7 +246,7 @@ namespace miniml {
           Node llvmType = NULL;
           if (type == TInt) {
             llvmType = Ti32;
-          } else if (type != TBool) {
+          } else if (type == TBool) {
             llvmType = Ti1;
           } else {
             return err(_(Type), "if-then-else type not supported");
@@ -299,40 +257,50 @@ namespace miniml {
           Node ifTrueId = Ident ^ _(True)->fresh();
           Node ifFalseId = Ident ^ _(False)->fresh();
 
-          // FIXME: concat for debug of code
-          Node ifTrueLabel =
-            Ident ^ ("ifthen" + std::string(_(True)->fresh().view()));
-          Node ifFalseLabel =
-            Ident ^ ("ifelse" + std::string(_(False)->fresh().view()));
-          Node ifEndLabel =
-            Ident ^ ("ifend" + std::string(_(Cond)->fresh().view()));
+          std::string ifId = node_val(condId);
+          Node thenLabel = Ident ^ ("then" + ifId);
+          Node thenEndLabel = Ident ^ ("thenEnd" + ifId);
+          Node elseLabel = Ident ^ ("else" + ifId);
+          Node elseEndLabel = Ident ^ ("elseEnd" + ifId);
+          Node ifEndLabel = Ident ^ ("ifEnd" + ifId);
 
           return Reapply
             << (Compile << condId << _(Cond))
             // Generate blocks/labels
-            << (Lift << Top << (Meta << (BlockMap << ifTrueLabel)))
-            << (Lift << Top << (Meta << (BlockMap << ifFalseLabel)))
+            << (Lift << Top << (Meta << (BlockMap << thenLabel)))
+            << (Lift << Top << (Meta << (BlockMap << thenEndLabel)))
+            << (Lift << Top << (Meta << (BlockMap << elseLabel)))
+            << (Lift << Top << (Meta << (BlockMap << elseEndLabel)))
             << (Lift << Top << (Meta << (BlockMap << ifEndLabel)))
-            // TODO: Branch instruction here
+            // If
             << (Lift << Top
                      << (Instr
                          << (TerminatorOp
-                             << (Branch << condId->clone()
-                                        << ifTrueLabel->clone()
-                                        << ifFalseLabel->clone()))))
-            // Then block
-            << (Lift << Top << (Label << ifTrueLabel->clone()))
+                             << (Branch << condId->clone() << thenLabel->clone()
+                                        << elseLabel->clone()))))
+            // Then
+            << (Lift << Top << (Label << thenLabel->clone()))
             << (Compile << ifTrueId << _(True))
             << (Lift << Top
                      << (Instr
-                         << (TerminatorOp << (Jump << ifEndLabel->clone()))))
-            // Else block
-            << (Lift << Top << (Label << ifFalseLabel->clone()))
-            << (Compile << ifFalseId << _(False))
+                         << (TerminatorOp << (Jump << thenEndLabel->clone()))))
+            // "Landing" block so Phi unaffected by branching in Then/Else expr.
+            << (Lift << Top << (Label << thenEndLabel->clone()))
             << (Lift << Top
                      << (Instr
                          << (TerminatorOp << (Jump << ifEndLabel->clone()))))
-            // End block
+            // Else
+            << (Lift << Top << (Label << elseLabel->clone()))
+            << (Compile << ifFalseId << _(False))
+            << (Lift << Top
+                     << (Instr
+                         << (TerminatorOp << (Jump << elseEndLabel->clone()))))
+            // "Landing" block so Phi unaffected by branching in Then/Else expr.
+            << (Lift << Top << (Label << elseEndLabel->clone()))
+            << (Lift << Top
+                     << (Instr
+                         << (TerminatorOp << (Jump << ifEndLabel->clone()))))
+            // ifEnd
             << (Lift << Top << (Label << ifEndLabel->clone()))
             << (Lift << Top
                      << (Instr
@@ -341,13 +309,9 @@ namespace miniml {
                                  << _(Ident) << llvmType
                                  << (Predecessor
                                      << (Prev << ifTrueId->clone()
-                                              << ifTrueLabel->clone())
+                                              << thenEndLabel->clone())
                                      << (Prev << ifFalseId->clone()
-                                              << ifFalseLabel->clone()))))));
-          // FIXME: Not sure how to do this. alloca?
-          // Then what should _(Ident) refer to?
-          // FIXME: _(Ident) needs to map to either the true or false branch,
-          // depends on cond. Phi instruction?
+                                              << elseEndLabel->clone()))))));
         },
 
         /**

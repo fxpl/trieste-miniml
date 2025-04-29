@@ -92,7 +92,7 @@ namespace miniml {
              */
             T(Instr)[Instr]
                 << (T(BinaryOp)
-                    << (T(Add, Sub, Mul)[Op] << T(Ident)[Ident] * T(Type) *
+                    << (T(Add, Sub, Mul)[Op] << T(Ident)[Ident] * T(Ti32) *
                           T(Int, Ident)[Lhs] * T(Int, Ident)[Rhs])) >>
               [context](Match& _) -> Node {
               // FIXME: Using T(Add,Sub,MUL) & T(Int,Ident) as match patterns is
@@ -171,8 +171,8 @@ namespace miniml {
             // Load
             T(Instr)[Instr]
                 << (T(MemoryOp)
-                    << (T(Load) << T(Ident)[Ident] *
-                          T(Ti32, Ti1)[Type] * T(Ident)[Src])) >>
+                    << (T(Load) << T(Ident)[Ident] * T(Ti32, Ti1)[Type] *
+                          T(Ident)[Src])) >>
               [context](Match& _) -> Node {
               // TODO: Handle other types
               std::string resultId = node_val(_(Ident));
@@ -209,12 +209,17 @@ namespace miniml {
               Value* param = context->registers[paramId];
               assert(param);
 
+              // TODO: Due to implementation the function identifier could be a
+              // register, function name or parameter.
               std::string tmpFuncId = node_val(_(Fun));
-              std::string funcName = context->functions[tmpFuncId];
-              assert(!funcName.empty());
+              // FIXME: temporarily only look for function in registers
+              // std::string funcName = context->functions[tmpFuncId];
+              // assert(!funcName.empty());
 
-              Function* function = context->llvm_module.getFunction(funcName);
-              assert(function);
+              // Function* function =
+              // context->llvm_module.getFunction(funcName); assert(function);
+
+              Function* function = (Function*)context->registers[tmpFuncId];
 
               std::string resultId = node_val(_(Result));
               Value* result =
@@ -355,6 +360,93 @@ namespace miniml {
               return _(Instr);
             },
 
+            // Return
+            T(Instr)[Instr]
+                << (T(TerminatorOp) << (T(Ret) << T(Ident)[Ident])) >>
+              [context](Match& _) -> Node {
+              std::string resultId = node_val(_(Ident));
+              Value* result = context->registers[resultId];
+              assert(result);
+
+              context->builder.CreateRet(result);
+
+              return _(Instr);
+            },
+
+            /**
+             * Function declaration
+             */
+            T(FunDef)[FunDef] << T(Ident)[Ident] * T(TypeArrow)[TypeArrow] *
+                  T(Ident)[Param] >>
+              [context](Match& _) -> Node {
+              // Create function type.
+              // TODO: Convert trieste::token to llvm::type* in helper function.
+              // TODO: Support TVar.
+              Node paramType = _(TypeArrow) / Ty1;
+              llvm::Type* paramLLVMType = NULL;
+              if (paramType == Ti32) {
+                paramLLVMType = context->builder.getInt32Ty();
+              } else if (paramType == Ti1) {
+                paramLLVMType = context->builder.getInt1Ty();
+              } else {
+                return err(_(Type), "Not a valid type for function parameter");
+              }
+              assert(paramLLVMType);
+
+              Node returnType = _(TypeArrow) / Ty2;
+              llvm::Type* returnLLVMType = NULL;
+              if (returnType == Ti32) {
+                returnLLVMType = context->builder.getInt32Ty();
+              } else if (returnType == Ti1) {
+                returnLLVMType = context->builder.getInt1Ty();
+              } else {
+                return err(_(Type), "Not a valid type for function return");
+              }
+              assert(returnLLVMType);
+
+              // FIXME: All functions assumed to have a single parameter.
+              // TODO: support nullary functions.
+              // TODO: support higher order functions.
+              // TODO: Should be possible to shadow functions
+              // TODO: if TVar: Need to determine which function to use
+              FunctionType* theFunctionType =
+                FunctionType::get(returnLLVMType, {paramLLVMType}, false);
+
+              // Create function prototype
+              std::string theFunctionName = node_val(_(Ident));
+              Function* theFunction = Function::Create(
+                theFunctionType,
+                // FIXME: Anytime non-external linkage is used?
+                Function::LinkageTypes::ExternalLinkage,
+                theFunctionName,
+                context->llvm_module);
+              theFunction->setCallingConv(CallingConv::C);
+              context->registers[theFunctionName] = theFunction;
+
+              // Name parameter(s)
+              // FIXME: Need to bind param name within function to argument.
+              std::string paramName = node_val(_(Param));
+              Argument* arg = theFunction->arg_begin();
+              arg->setName(paramName);
+              // FIXME: this is a workaround to bind paramName to argument.
+              // FIXME: I just assume param names never shadow existing
+              // variables.
+              context->registers[paramName] = arg;
+
+              // Create function body block
+              // FIXME: Assumes next instruction is the function body.
+              BasicBlock* printBoolBody = BasicBlock::Create(
+                context->llvm_context, theFunctionName + "_entry", theFunction);
+              context->builder.SetInsertPoint(printBoolBody);
+
+              // Map function name to temporary identifier.
+              context->functions[theFunctionName] = theFunctionName;
+
+              context->mainFunction = theFunction;
+
+              return _(FunDef);
+            },
+
             /**
              * Meta operations since LLVM IR does not allow assigning a register
              * to another
@@ -366,18 +458,22 @@ namespace miniml {
               std::string src = node_val(_(Src));
               Value* srcVal = context->registers[src];
               assert(srcVal);
+              
               context->registers[dst] = srcVal;
 
               // Remove the meta node from the AST.
               return {};
             },
 
-            // Map the temporary id `Ident` to function name `Fun`.
+            // Map the temporary id `Ident` to function `Fun`.
             T(Meta) << (T(FuncMap) << T(Ident)[Ident] * T(Ident)[Fun]) >>
               [context](Match& _) -> Node {
               std::string tmpIdent = node_val(_(Ident));
               std::string functionName = node_val(_(Fun));
-              context->functions[tmpIdent] = functionName;
+              Function *theFunction = context->llvm_module.getFunction(functionName);
+              assert(theFunction);
+          
+              context->registers[tmpIdent] = theFunction;
 
               // Remove the meta node from the AST.
               return {};
@@ -413,10 +509,22 @@ namespace miniml {
 
               // TODO: How to keep track of parent when this is in the body of a
               // function!?
+              // What if context->mainFunction is a stack and we always just
+              // reference the top?
               BasicBlock* block = BasicBlock::Create(
                 context->llvm_context, blockId, context->mainFunction);
 
               context->basicBlocks[blockId] = block;
+
+              // Remove the meta node from the AST.
+              return {};
+            },
+
+            // Assign temporary identifier to current Basic Block.
+            T(Meta) << (T(BlockCpy) << T(Ident)[Ident]) >>
+              [context](Match& _) -> Node {
+              context->basicBlocks[node_val(_(Ident))] =
+                context->builder.GetInsertBlock();
 
               // Remove the meta node from the AST.
               return {};
@@ -427,8 +535,6 @@ namespace miniml {
       /**
        * External functions
        */
-      auto ctx = context;
-
       genExternalFunctions(context);
 
       /**
@@ -463,9 +569,9 @@ namespace miniml {
 
       Function* printFun = NULL;
       if (resultType == context->builder.getInt1Ty()) {
-        printFun = context->llvm_module.getFunction("printBool");
+        printFun = context->llvm_module.getFunction("native$printBool");
       } else if (resultType == context->builder.getInt32Ty()) {
-        printFun = context->llvm_module.getFunction("printInt");
+        printFun = context->llvm_module.getFunction("native$printInt");
       } else {
         // TODO: Error! Printtype not implemented!
       }
@@ -515,22 +621,25 @@ namespace miniml {
       "%d\n", "formatStrInt", 0, &context->llvm_module);
 
     // printInt(i32) -> i32
-    FunctionType* printIntType = FunctionType::get(
+    FunctionType* theFunctionType = FunctionType::get(
       context->builder.getInt32Ty(), {context->builder.getInt32Ty()}, false);
 
-    Function* printInt = Function::Create(
-      printIntType,
+    // FIXME: native functions use an internal name which must not be shadowed
+    // by the user. Need to use a name that is not allowable in the language.
+    std::string functionName = "native$printInt";
+    Function* theFunction = Function::Create(
+      theFunctionType,
       Function::LinkageTypes::ExternalLinkage,
-      "printInt",
+      functionName,
       context->llvm_module);
+    theFunction->setCallingConv(CallingConv::C);
+    context->registers[functionName] = theFunction;
 
-    printInt->setCallingConv(CallingConv::C);
+    BasicBlock* functionEntryBlock =
+      BasicBlock::Create(context->llvm_context, "printIntBody", theFunction);
+    context->builder.SetInsertPoint(functionEntryBlock);
 
-    BasicBlock* printIntBody =
-      BasicBlock::Create(context->llvm_context, "printIntBody", printInt);
-    context->builder.SetInsertPoint(printIntBody);
-
-    Argument* arg = printInt->arg_begin();
+    Argument* arg = theFunction->arg_begin();
     arg->setName("intToPrint");
 
     Function* printfFunc = context->llvm_module.getFunction("printf");
@@ -538,7 +647,7 @@ namespace miniml {
 
     context->builder.CreateRet(arg);
 
-    verifyFunction(*printInt, &llvm::errs());
+    verifyFunction(*theFunction, &llvm::errs());
   }
   /**
    * Generates a function that prints a boolean value.
@@ -552,22 +661,23 @@ namespace miniml {
       "false\n", "strBoolFalse", 0, &context->llvm_module);
 
     // printInt(i1) -> i1
-    FunctionType* printBoolType = FunctionType::get(
+    FunctionType* theFunctionType = FunctionType::get(
       context->builder.getInt1Ty(), {context->builder.getInt1Ty()}, false);
 
-    Function* printBool = Function::Create(
-      printBoolType,
+    std::string functionName = "native$printBool";
+    Function* theFunction = Function::Create(
+      theFunctionType,
       Function::LinkageTypes::ExternalLinkage,
-      "printBool",
+      functionName,
       context->llvm_module);
+    theFunction->setCallingConv(CallingConv::C);
+    context->registers[functionName] = theFunction;
 
-    printBool->setCallingConv(CallingConv::C);
+    BasicBlock* functionEntryBlock =
+      BasicBlock::Create(context->llvm_context, "printBoolBody", theFunction);
+    context->builder.SetInsertPoint(functionEntryBlock);
 
-    BasicBlock* printBoolBody =
-      BasicBlock::Create(context->llvm_context, "printBoolBody", printBool);
-    context->builder.SetInsertPoint(printBoolBody);
-
-    Argument* arg = printBool->arg_begin();
+    Argument* arg = theFunction->arg_begin();
     arg->setName("boolToPrint");
 
     Function* printfFunc = context->llvm_module.getFunction("printf");
@@ -577,7 +687,7 @@ namespace miniml {
 
     context->builder.CreateRet(arg);
 
-    verifyFunction(*printBool, &llvm::errs());
+    verifyFunction(*theFunction, &llvm::errs());
   }
 
 }

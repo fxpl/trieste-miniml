@@ -96,9 +96,8 @@ namespace miniml {
   inline const auto Compile = TokenDef("compile");
 
   inline const auto Instr = TokenDef("instr");
-  inline const auto BlockMap = TokenDef("block_map");
   inline const auto Label = TokenDef("label");
-
+  
   // BinaryOps
   inline const auto BinaryOp = TokenDef("binary_op");
   
@@ -112,6 +111,7 @@ namespace miniml {
   inline const auto TerminatorOp = TokenDef("terminator_op");
   inline const auto Branch = TokenDef("branch");
   inline const auto Jump = TokenDef("jump");
+  inline const auto Ret = TokenDef("return");
 
   // MiscOps
   inline const auto MiscOp = TokenDef("misc_op");
@@ -124,6 +124,8 @@ namespace miniml {
   inline const auto RegCpy = TokenDef("reg_cpy");
   inline const auto RegMap = TokenDef("reg_map");
   inline const auto FuncMap = TokenDef("func_map");
+  inline const auto BlockMap = TokenDef("block_map");
+  inline const auto BlockCpy = TokenDef("block_cpy");
   
   // LLVM IR Types
   inline const auto Ti32 = TokenDef("i32");

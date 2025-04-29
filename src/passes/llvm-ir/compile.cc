@@ -1,5 +1,6 @@
 #include "../../miniml-lang.hh"
 #include "../internal.hh"
+#include "../llvm_utils.hh"
 #include "../utils.hh"
 #include "trieste/token.h"
 
@@ -80,9 +81,9 @@ namespace miniml {
         /**
          * Let
          */
-        T(Compile) << T(Ident)[Ident] *
-              (T(Let)[Let] << T(Ident)[Dst] * (T(Type) << (T(ForAllTy)[Type])) *
-                 T(Expr)[Expr]) >>
+        T(Compile) << T(Ident)[Result] *
+              (T(Let)[Let] << T(Ident)[Ident] *
+                 (T(Type) << (T(ForAllTy)[Type])) * T(Expr)[Expr]) >>
           [](Match& _) -> Node {
           // TODO: Let now stores it on the stack and then loads it into a
           // register. Should probably just store it and use another token as
@@ -94,40 +95,24 @@ namespace miniml {
           // pretend it cannot be nested and ignore it.
           Node type = get_type(_(Type));
 
-          // FIXME: I'm seemingly writning Type handling in every rule. Maybe it
-          // should be a separate pass somehow?
-          Node llvmType = NULL;
-          if (type == TBool) {
-            llvmType = Ti1;
-          } else if (type == TInt) {
-            llvmType = Ti32;
-          } else {
+          Node llvmType = getLLVMType(type);
+          if (llvmType == nullptr) {
             return err(_(Type), "let type not supported");
           }
 
+          // Bind expr to both Ident and Dst
           return Reapply
+            << (Compile << _(Ident) << _(Expr))
             << (Lift << Top
-                     << (Instr
-                         << (MemoryOp
-                             << (Alloca << tmpPtr->clone()
-                                        << llvmType->clone()))))
-            << (Compile << _(Dst) << _(Expr))
-            << (Lift << Top
-                     << (Instr
-                         << (MemoryOp
-                             << (Store << _(Dst)->clone() << tmpPtr->clone()))))
-            // Then copy it into _(Ident) so [[_]]ident is correct.
-            << (Lift << Top
-                     << (Instr
-                         << (MemoryOp
-                             << (Load << _(Ident) << llvmType << tmpPtr))));
+                     << (Meta << (RegCpy << _(Result) << _(Ident)->clone())));
         },
 
         /**
          * Boolean
          */
         T(Compile) << T(Ident)[Ident] *
-              (T(Expr) << (T(Type) << T(TBool)) * T(True, False)[IRValue]) >>
+              (T(Expr) << (T(Type) << T(TBool)[Type]) *
+                 T(True, False)[IRValue]) >>
           [](Match& _) -> Node {
           Node value = NULL;
           if (_(IRValue) == True) {
@@ -137,18 +122,24 @@ namespace miniml {
           }
           assert(value);
 
-          return Meta << (RegMap << _(Ident) << Ti1 << value);
+          Node llvmType = getLLVMType(_(Type));
+          assert(llvmType);
+
+          return Meta << (RegMap << _(Ident) << llvmType << value);
         },
 
         /**
          * Integer
          */
         T(Compile) << T(Ident)[Ident] *
-              (T(Expr) << (T(Type) << T(TInt)) * T(Int)[Int]) >>
+              (T(Expr) << (T(Type) << T(TInt)[Type]) * T(Int)[Int]) >>
           [](Match& _) -> Node {
           Node value = IRValue ^ node_val(_(Int));
 
-          return Meta << (RegMap << _(Ident) << Ti32 << value);
+          Node llvmType = getLLVMType(_(Type));
+          assert(llvmType);
+
+          return Meta << (RegMap << _(Ident) << llvmType << value);
         },
 
         /**
@@ -166,7 +157,7 @@ namespace miniml {
          * Binary operation.
          */
         T(Compile) << T(Ident)[Ident] *
-              (T(Expr) << (T(Type)[Type] << T(TInt)) *
+              (T(Expr) << (T(Type) << T(TInt)[Type]) *
                  (T(Add, Sub, Mul)[BinaryOp] << T(Expr)[Lhs] * T(Expr)[Rhs])) >>
           [](Match& _) -> Node {
           Node op = NULL;
@@ -181,6 +172,9 @@ namespace miniml {
           }
           assert(op);
 
+          Node llvmType = getLLVMType(_(Type));
+          assert(llvmType);
+
           Node lhsIdent = Ident ^ _(Lhs)->fresh();
           Node rhsIdent = Ident ^ _(Rhs)->fresh();
 
@@ -190,7 +184,7 @@ namespace miniml {
                          << (Lift << Top
                                   << (Instr
                                       << (BinaryOp
-                                          << (op << _(Ident) << _(Type)
+                                          << (op << _(Ident) << llvmType
                                                  << lhsIdent << rhsIdent))));
         },
 
@@ -201,16 +195,13 @@ namespace miniml {
               (T(Expr) << (T(Type) << T(TBool)) *
                  (T(Equals, LT)[Op] << T(Expr)[Lhs] * T(Expr)[Rhs])) >>
           [](Match& _) -> Node {
-          if (
-            (_(Lhs) / Type / Type)->type() != (_(Rhs) / Type / Type)->type()) {
+          if (get_type(_(Lhs))->type() != get_type(_(Rhs))->type()) {
             return err(_(Op), "comparison operands have different types");
           }
 
           Node type = get_type(_(Lhs));
-          Node llvmType = NULL;
-          if (type == TInt) {
-            llvmType = Ti32;
-          } else {
+          Node llvmType = getLLVMType(type);
+          if (llvmType == nullptr) {
             return err(_(Lhs) / Type, "comparison type not supported");
           }
 
@@ -239,16 +230,12 @@ namespace miniml {
          * If-then-else
          */
         T(Compile) << T(Ident)[Ident] *
-              (T(Expr) << T(Type)[Type] *
+              (T(Expr)[Expr] << T(Type) *
                  (T(If) << T(Expr)[Cond] * T(Expr)[True] * T(Expr)[False])) >>
           [](Match& _) -> Node {
-          Node type = _(Type) / Type;
-          Node llvmType = NULL;
-          if (type == TInt) {
-            llvmType = Ti32;
-          } else if (type == TBool) {
-            llvmType = Ti1;
-          } else {
+          Node type = get_type(_(Expr));
+          Node llvmType = getLLVMType(type);
+          if (type == nullptr) {
             return err(_(Type), "if-then-else type not supported");
           }
           assert(llvmType);
@@ -318,7 +305,7 @@ namespace miniml {
          * Apply
          */
         T(Compile) << T(Ident)[Ident] *
-              (T(Expr) << (T(Type) << T(TInt, TBool)[Type]) *
+              (T(Expr) << (T(Type) << T(TInt, TBool)) *
                  (T(App) << (T(Expr)[Fun]) * T(Expr)[Param])) >>
           [](Match& _) -> Node {
           Node argIdent = Ident ^ _(Param)->fresh();
@@ -345,10 +332,10 @@ namespace miniml {
           }
 
           if ((_(TypeArrow) / Ty1 == TInt) && (_(TypeArrow) / Ty2 == TInt)) {
-            funcName = Ident ^ "printInt";
+            funcName = Ident ^ "native$printInt";
           } else if (
             (_(TypeArrow) / Ty1 == TBool) && (_(TypeArrow) / Ty2 == TBool)) {
-            funcName = Ident ^ "printBool";
+            funcName = Ident ^ "native$printBool";
           }
 
           if (!funcName) {
@@ -356,6 +343,83 @@ namespace miniml {
           }
 
           return Lift << Top << (Meta << (FuncMap << _(Ident) << funcName));
+        },
+
+        /**
+         * Fun
+         */
+        T(Compile) << T(Ident)[Ident] *
+              (T(Expr) << T(Type) *
+                 (T(Fun)
+                  << (T(FunDef) << T(Ident)[Fun] * T(Type)[Type] *
+                        T(Param)[Param] * T(Expr)[Expr]))) >>
+          [](Match& _) -> Node {
+          // When compiling a function we need to
+          // - create function type
+          // TODO: How to deal with t_var? LLVM IR is strongly typed..
+          // TODO: if type is TVar, then we need to create a function for each
+          // type.
+          // TODO: figure out how to identify which type to call when evaluating
+          // the call.
+          // FIXME: Just ignore TVar for now.
+          Node type = _(Type) / Type;
+          Node paramType = getLLVMType(type / Ty1);
+          Node returnType = getLLVMType(type / Ty2);
+          assert(paramType);
+          assert(returnType);
+
+          Node funType = TypeArrow << paramType << returnType;
+
+
+          // TODO: Deal with function naming. example:
+          // let id = fun f x is x;;
+          // Both ´id´(Ident) and ´f´(Fun) point to same function.
+          // But f is only inside the scope of the function.
+          // Can we use Trieste symboltable maybe?
+          Node f = _(Fun);
+
+          std::string funStr = node_val(_(Ident));
+
+          Node funBodyLabel = Ident ^ ("funBody_" + funStr);
+
+          Node originBlock = Ident ^ ("prevBlock_" + funStr);
+          Node returnId = Ident ^ ("retVal_" + funStr);
+
+          // -- need to bind the arguments of the function
+          // -- here, any free variables?!
+
+          return Reapply
+            // Create function body block.
+            // << (Lift << Top << (Meta << (BlockMap << funBodyLabel)))
+            // Remember block where function was declared.
+            << (Lift << Top << (Meta << (BlockCpy << originBlock)))
+            // Tell code generator to create a function: its type, name, param.
+            << (Lift << Top
+                     << (FunDef << _(Ident) << funType << (_(Param) / Ident)))
+            // Bind function to its internal name.
+            << (Lift << Top << (Meta << (FuncMap << f << _(Ident)->clone())))
+            // Set builder insertion point to function body.
+            // << (Lift << Top << (Label << funBodyLabel->clone()))
+            // TODO: Need to bind the block to the function.
+            << (Compile << returnId << _(Expr))
+            // MiniML has implicit return so must insert it here.
+            << (Lift << Top
+                     << (Instr << (TerminatorOp << (Ret << returnId->clone()))))
+            // TODO: Pop current function.
+            //       (So any future blocks does not belong to this function)
+            // Reset IR builder insertion point.
+            << (Lift << Top << (Label << originBlock->clone()));
+        },
+
+        /**
+         * Parameter
+         */
+        T(Compile) << (T(Param) << T(Ident)[Ident] * T(Type)[Type]) >>
+          [](Match& _) -> Node {
+          Node llvmType = getLLVMType(_(Type) / Type);
+          assert(llvmType);
+
+          return Param << _(Ident) << llvmType;
         },
       }};
   }

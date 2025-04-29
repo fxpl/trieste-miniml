@@ -26,6 +26,10 @@ run `make llvm` for manual testing of the miniML->LLVM IR passes.
 The command reads an miniML program from `llvmir_tests/test.miniml` and generates a trieste AST representation in `out/test.trieste`, an equivalent LLVM IR program in `out/test.ll` and finally a compiled executable in `out/test.out`.
 The miniML source, trieste AST representation, LLVM IR and return value of the executable is printed to stdout.
 
+run `make opt-llvm O=<level>` to print optimized version of `out/test.ll`.
+
+The command runs the input file through the LLVM optimization pipeline via `opt` and stores the optimized version in `out/test_o<level>.ll` after optimizing with `-O<level>` flag (similar to clang's -O flag) where `<level> = {0,1,2,3}`.
+
 ### Requirements
 
 This project includes LLVM in order to perform generation of LLVM IR code.

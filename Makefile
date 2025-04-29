@@ -38,7 +38,7 @@ clean:
 .PHONY: clean all build/miniml test
 
 ## MANUAL TESTS FOR DEVELOPMENT ##
-llvm: out generate-code print-miniml print-ast print-ll compile-llvm
+llvm: out generate-code print-ast print-miniml print-ll compile-llvm
 
 generate-code: all
 	touch out/test.trieste; > out/test.trieste; ./build/miniml build llvmir_tests/test.miniml -o out/test.trieste;
@@ -56,3 +56,5 @@ compile-llvm:
 # This is a test for the LLVM IR files. It compiles the LLVM IR file, runs it and prints returnval to stdout.
 	clang out/test.ll -o out/test.out; ./out/test.out; echo $$?
 
+opt-llvm:
+	opt out/test.ll -O$O -S -o out/test2.ll; cat out/test2.ll

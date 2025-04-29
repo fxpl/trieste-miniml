@@ -222,45 +222,50 @@ namespace miniml{
     // sle: signed less or equal
     // Unsigned
     inline const auto wf_comparison = (EQ | NE | UGT | UGE | ULT | ULE | SGT | SGE | SLT | SLE);
-    inline const auto wf_llvm_types = (Ti1 | Ti32); 
+    inline const auto wf_llvm_types = (Ti1 | Ti32 | TypeArrow); 
 
     inline const auto wf_operand = (Int | Ident);
     
     inline const auto wf =
-    (Top <<= (Instr | Label | Meta)++)
+    (Top <<= (Instr | Label | FunDef | Meta)++)
     // Meta operations to handle LLVM IR limitations.
-    | (Meta <<= (RegCpy | RegMap | FuncMap | BlockMap))
+    | (Meta <<= (RegCpy | RegMap | FuncMap | BlockMap | BlockCpy))
       // RegCpy copy the value from Src to Dst.
       | (RegCpy <<= (Dst >>= Ident) * (Src >>= Ident))
       // Create a new value.
       | (RegMap <<= Ident * (Type >>= Ti32 | Ti1) * IRValue)
       // Create a new block.
       | (BlockMap <<= Ident)
+      // Copy current block to `Ident`.
+      | (BlockCpy <<= Ident)
       // Map the temporary id `Ident` to function name `Fun`.
       | (FuncMap <<= Ident * (Fun >>= Ident))
     // Real wf begins.
     | (Instr <<= (BinaryOp | MemoryOp | TerminatorOp | MiscOp))
     | (BinaryOp <<= (Add | Sub | Mul))
-      | (Add <<= (Result >>= Ident) * Type * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
-      | (Sub <<= (Result >>= Ident) * Type * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
-      | (Mul <<= (Result >>= Ident) * Type * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
+      | (Add <<= (Result >>= Ident) * (Type >>= Ti32) * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
+      | (Sub <<= (Result >>= Ident) * (Type >>= Ti32) * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
+      | (Mul <<= (Result >>= Ident) * (Type >>= Ti32) * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
     | (MemoryOp <<= (Alloca | Load | Store))
       | (Alloca <<= (Result >>= Ident) * (Type >>= wf_llvm_types))
       | (Load <<= (Result >>= Ident) * (Type >>= wf_llvm_types) * (Src >>= Ident))
       | (Store <<= (IRValue >>= Ident) * (Dst >>= Ident))
     | (MiscOp <<= (Call | Icmp | Phi))
       | (Call <<= (Result >>= Ident) * (Fun >>= Ident) * (Param >>= Ident))
-      | (Icmp <<= (Result >>= Ident) * (Op >>= wf_comparison) * (Type >>= wf_llvm_types) * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
+      | (Icmp <<= (Result >>= Ident) * (Op >>= wf_comparison) * (Type >>= (Ti1 | Ti32)) * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
       | (Phi <<= (Result >>= Ident) * (Type >>= wf_llvm_types) * Predecessor)
         // TODO: Can probably organise better.
         | (Predecessor <<= Prev++)
           | (Prev <<= (IRValue >>= Ident) * (Label >>= Ident))
-    | (TerminatorOp <<= (Branch | Jump))
+    | (TerminatorOp <<= (Branch | Jump | Ret))
       | (Branch <<= (Cond >>= Ident) * (True >>= Ident) * (False >>= Ident))
       | (Jump <<= (Label >>= Ident))
+      | (Ret <<= Ident)
       // TODO: From frontend, should be replaced by LLVM tokens.
-    | (Label <<= Ident) 
-    | (Type <<= (Type >>= wf_types | ForAllTy)) 
+    | (Label <<= Ident)
+    | (FunDef <<= Ident * (Type >>= wf_llvm_types) * (Param >>= Ident))
+      | (Param <<= Ident * (Type >>= wf_llvm_types))
+    | (TypeArrow <<= (Ty1 >>= wf_llvm_types) * (Ty2 >>= wf_llvm_types))
     ;
   }
 
@@ -270,7 +275,6 @@ namespace miniml{
 
   inline const auto wf =
     LLVMIRCompilation::wf - Meta
-    | (Top <<= (Instr)++)
     ;
       
     }

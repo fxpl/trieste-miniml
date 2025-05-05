@@ -40,6 +40,8 @@ clean:
 ## MANUAL TESTS FOR DEVELOPMENT ##
 llvm: out generate-code print-ast print-miniml print-ll compile-llvm
 
+ast: out generate-code print-ast print-miniml
+
 generate-code: all
 	touch out/test.trieste; > out/test.trieste; ./build/miniml build llvmir_tests/test.miniml -o out/test.trieste;
 

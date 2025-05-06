@@ -227,7 +227,8 @@ namespace miniml{
     inline const auto wf_operand = (Int | Ident);
     
     inline const auto wf =
-    (Top <<= (Instr | Label | FunDef | Meta)++)
+    (Top <<= Ident * Program)
+    | (Program <<= (Instr | Label | FunDef | Meta)++)
     // Meta operations to handle LLVM IR limitations.
     | (Meta <<= (RegCpy | RegMap | FuncMap | BlockMap | BlockCpy))
       // RegCpy copy the value from Src to Dst.

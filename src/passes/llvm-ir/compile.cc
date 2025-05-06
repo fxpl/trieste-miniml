@@ -25,15 +25,17 @@ namespace miniml {
     return {
       "compile",
       LLVMIRCompilation::wf,
-      (dir::topdown | dir::once),
+      (dir::topdown),
       {
         /**
          * Add compile node and assign tmp/register.
          */
-        In(Top) * T(Program)[Program] >> [](Match& _) -> Node {
+        In(Top) * Start * T(Program)[Program] * End >> [](Match& _) -> Node {
           Node result = Ident ^ _(Program)->fresh();
 
-          return Reapply << (Compile << result << _(Program));
+          std::cout << "Compile Top" << std::endl;
+
+          return (Compile << result << _(Program));
         },
 
         /**
@@ -41,21 +43,20 @@ namespace miniml {
          */
         T(Compile) << T(Ident)[Ident] * T(Program)[Program] >>
           [](Match& _) -> Node {
+          std::cout << "Compiling program" << std::endl;
           auto prog = _(Program);
-
-          Node reapply = Reapply;
 
           // Generate identifiers for each of the program's top expressions.
           for (size_t i = 0; i < prog->size() - 1; i++) {
             Node ident = Ident ^ prog->fresh();
             Node topexpr = prog->at(i);
 
-            reapply << (Compile << ident << topexpr);
+            prog->replace_at(i, Compile << ident << topexpr);
           }
 
           // The last topexpression is bound to the identifier of the program.
           Node topexpr = prog->at(prog->size() - 1);
-          reapply << (Compile << _(Ident) << topexpr);
+          prog->replace_at(prog->size() - 1, (Compile << _(Ident) << topexpr));
 
           // TODO: Is this still a good idea?
           //
@@ -67,16 +68,14 @@ namespace miniml {
           //
           // Where Ident holds the identifier of the program return value.
 
-          return reapply;
+          return Seq << _(Ident)->clone() << prog;
         },
 
         /**
          * Compile TopExpression.
          */
         T(Compile) << T(Ident)[Ident] * (T(TopExpr) << T(Expr, Let)[Expr]) >>
-          [](Match& _) -> Node {
-          return Reapply << (Compile << _(Ident) << _(Expr));
-        },
+          [](Match& _) -> Node { return (Compile << _(Ident) << _(Expr)); },
 
         /**
          * Let
@@ -101,10 +100,8 @@ namespace miniml {
           }
 
           // Bind expr to both Ident and Dst
-          return Reapply
-            << (Compile << _(Ident) << _(Expr))
-            << (Lift << Top
-                     << (Meta << (RegCpy << _(Result) << _(Ident)->clone())));
+          return Seq << (Compile << _(Ident) << _(Expr))
+                     << (Meta << (RegCpy << _(Result) << _(Ident)->clone()));
         },
 
         /**
@@ -179,13 +176,12 @@ namespace miniml {
           Node rhsIdent = Ident ^ _(Rhs)->fresh();
 
           // Instruction
-          return Reapply << (Compile << lhsIdent->clone() << _(Lhs))
-                         << (Compile << rhsIdent->clone() << _(Rhs))
-                         << (Lift << Top
-                                  << (Instr
-                                      << (BinaryOp
-                                          << (op << _(Ident) << llvmType
-                                                 << lhsIdent << rhsIdent))));
+          return Seq << (Compile << lhsIdent->clone() << _(Lhs))
+                     << (Compile << rhsIdent->clone() << _(Rhs))
+                     << (Instr
+                         << (BinaryOp
+                             << (op << _(Ident) << llvmType << lhsIdent
+                                    << rhsIdent)));
         },
 
         /**
@@ -217,13 +213,12 @@ namespace miniml {
           Node lhsIdent = Ident ^ _(Lhs)->fresh();
           Node rhsIdent = Ident ^ _(Rhs)->fresh();
 
-          return Reapply << (Compile << lhsIdent->clone() << _(Lhs))
-                         << (Compile << rhsIdent->clone() << _(Rhs))
-                         << (Lift << Top
-                                  << (Instr
-                                      << (MiscOp
-                                          << (Icmp << _(Ident) << op << llvmType
-                                                   << lhsIdent << rhsIdent))));
+          return Seq << (Compile << lhsIdent->clone() << _(Lhs))
+                     << (Compile << rhsIdent->clone() << _(Rhs))
+                     << (Instr
+                         << (MiscOp
+                             << (Icmp << _(Ident) << op << llvmType << lhsIdent
+                                      << rhsIdent)));
         },
 
         /**
@@ -251,54 +246,43 @@ namespace miniml {
           Node elseEndLabel = Ident ^ ("elseEnd" + ifId);
           Node ifEndLabel = Ident ^ ("ifEnd" + ifId);
 
-          return Reapply
+          return Seq
             << (Compile << condId << _(Cond))
             // Generate blocks/labels
-            << (Lift << Top << (Meta << (BlockMap << thenLabel)))
-            << (Lift << Top << (Meta << (BlockMap << thenEndLabel)))
-            << (Lift << Top << (Meta << (BlockMap << elseLabel)))
-            << (Lift << Top << (Meta << (BlockMap << elseEndLabel)))
-            << (Lift << Top << (Meta << (BlockMap << ifEndLabel)))
+            << (Meta << (BlockMap << thenLabel))
+            << (Meta << (BlockMap << thenEndLabel))
+            << (Meta << (BlockMap << elseLabel))
+            << (Meta << (BlockMap << elseEndLabel))
+            << (Meta << (BlockMap << ifEndLabel))
             // If
-            << (Lift << Top
-                     << (Instr
-                         << (TerminatorOp
-                             << (Branch << condId->clone() << thenLabel->clone()
-                                        << elseLabel->clone()))))
+
+            << (Instr
+                << (TerminatorOp
+                    << (Branch << condId->clone() << thenLabel->clone()
+                               << elseLabel->clone())))
             // Then
-            << (Lift << Top << (Label << thenLabel->clone()))
-            << (Compile << ifTrueId << _(True))
-            << (Lift << Top
-                     << (Instr
-                         << (TerminatorOp << (Jump << thenEndLabel->clone()))))
+            << (Label << thenLabel->clone()) << (Compile << ifTrueId << _(True))
+            << (Instr << (TerminatorOp << (Jump << thenEndLabel->clone())))
             // "Landing" block so Phi unaffected by branching in Then/Else expr.
-            << (Lift << Top << (Label << thenEndLabel->clone()))
-            << (Lift << Top
-                     << (Instr
-                         << (TerminatorOp << (Jump << ifEndLabel->clone()))))
+            << (Label << thenEndLabel->clone())
+            << (Instr << (TerminatorOp << (Jump << ifEndLabel->clone())))
             // Else
-            << (Lift << Top << (Label << elseLabel->clone()))
+            << (Label << elseLabel->clone())
             << (Compile << ifFalseId << _(False))
-            << (Lift << Top
-                     << (Instr
-                         << (TerminatorOp << (Jump << elseEndLabel->clone()))))
+            << (Instr << (TerminatorOp << (Jump << elseEndLabel->clone())))
             // "Landing" block so Phi unaffected by branching in Then/Else expr.
-            << (Lift << Top << (Label << elseEndLabel->clone()))
-            << (Lift << Top
-                     << (Instr
-                         << (TerminatorOp << (Jump << ifEndLabel->clone()))))
+            << (Label << elseEndLabel->clone())
+            << (Instr << (TerminatorOp << (Jump << ifEndLabel->clone())))
             // ifEnd
-            << (Lift << Top << (Label << ifEndLabel->clone()))
-            << (Lift << Top
-                     << (Instr
-                         << (MiscOp
-                             << (Phi
-                                 << _(Ident) << llvmType
-                                 << (Predecessor
-                                     << (Prev << ifTrueId->clone()
-                                              << thenEndLabel->clone())
-                                     << (Prev << ifFalseId->clone()
-                                              << elseEndLabel->clone()))))));
+            << (Label << ifEndLabel->clone())
+            << (Instr
+                << (MiscOp
+                    << (Phi
+                        << _(Ident) << llvmType
+                        << (Predecessor << (Prev << ifTrueId->clone()
+                                                 << thenEndLabel->clone())
+                                        << (Prev << ifFalseId->clone()
+                                                 << elseEndLabel->clone())))));
         },
 
         /**
@@ -311,13 +295,11 @@ namespace miniml {
           Node argIdent = Ident ^ _(Param)->fresh();
           Node funIdent = Ident ^ _(Fun)->fresh();
 
-          return Reapply << (Compile << argIdent->clone() << _(Param))
-                         << (Compile << funIdent->clone() << _(Fun))
-                         << (Lift << Top
-                                  << (Instr
-                                      << (MiscOp
-                                          << (Call << _(Ident) << funIdent
-                                                   << argIdent))));
+          return Seq << (Compile << argIdent->clone() << _(Param))
+                     << (Compile << funIdent->clone() << _(Fun))
+                     << (Instr
+                         << (MiscOp
+                             << (Call << _(Ident) << funIdent << argIdent)));
         },
 
         /**
@@ -342,7 +324,7 @@ namespace miniml {
             return err(_(TypeArrow), "print function with this type not found");
           }
 
-          return Lift << Top << (Meta << (FuncMap << _(Ident) << funcName));
+          return (Meta << (FuncMap << _(Ident) << funcName));
         },
 
         /**
@@ -370,7 +352,6 @@ namespace miniml {
 
           Node funType = TypeArrow << paramType << returnType;
 
-
           // TODO: Deal with function naming. example:
           // let id = fun f x is x;;
           // Both ´id´(Ident) and ´f´(Fun) point to same function.
@@ -388,27 +369,25 @@ namespace miniml {
           // -- need to bind the arguments of the function
           // -- here, any free variables?!
 
-          return Reapply
+          return Seq
             // Create function body block.
             // << (Lift << Top << (Meta << (BlockMap << funBodyLabel)))
             // Remember block where function was declared.
-            << (Lift << Top << (Meta << (BlockCpy << originBlock)))
+            << (Meta << (BlockCpy << originBlock))
             // Tell code generator to create a function: its type, name, param.
-            << (Lift << Top
-                     << (FunDef << _(Ident) << funType << (_(Param) / Ident)))
+            << (FunDef << _(Ident) << funType << (_(Param) / Ident))
             // Bind function to its internal name.
-            << (Lift << Top << (Meta << (FuncMap << f << _(Ident)->clone())))
+            << (Meta << (FuncMap << f << _(Ident)->clone()))
             // Set builder insertion point to function body.
             // << (Lift << Top << (Label << funBodyLabel->clone()))
             // TODO: Need to bind the block to the function.
             << (Compile << returnId << _(Expr))
             // MiniML has implicit return so must insert it here.
-            << (Lift << Top
-                     << (Instr << (TerminatorOp << (Ret << returnId->clone()))))
+            << (Instr << (TerminatorOp << (Ret << returnId->clone())))
             // TODO: Pop current function.
             //       (So any future blocks does not belong to this function)
             // Reset IR builder insertion point.
-            << (Lift << Top << (Label << originBlock->clone()));
+            << (Label << originBlock->clone());
         },
 
         /**

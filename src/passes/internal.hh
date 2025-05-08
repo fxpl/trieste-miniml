@@ -172,10 +172,10 @@ namespace miniml{
     | (Type <<= (Type >>= wf_types | ForAllTy))
     | (ForAllTy <<= TVars * Type)
     | (TVars <<= TVar++)
-    | (Let <<= Ident * Type * Expr)
+    | (Let <<= Ident * Type * Expr)[Ident]
     | (Expr <<= Type * (Expr >>= wf_expr))
-    | (Param <<= Ident * Type)
-    | (FunDef <<= Ident * Type * Param * Expr)
+    | (Param <<= Ident * Type)[Ident]
+    | (FunDef <<= Ident * Type * Param * Expr)[Ident]
     ;
 
     }
@@ -183,7 +183,7 @@ namespace miniml{
   namespace LLVMIRCompilation{
 
     // FIXME: Only for reference.
-    //        Unfolded version of WF from typechecker
+    //        Manually unfolderd WF from typechecker
     inline const auto wf_fresh =
     (Top <<= File)
     | (File <<= Program)

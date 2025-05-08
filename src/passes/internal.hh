@@ -231,13 +231,9 @@ namespace miniml{
     | (Program <<= (IRFun)++[1])
     | (IRFun <<= (Instr | Label | FunDef | Meta)++[1])
     // Meta operations to handle LLVM IR limitations.
-    | (Meta <<= (RegCpy | RegMap | FuncMap | BlockMap | BlockCpy))
-      // RegCpy copy the value from Src to Dst.
-      | (RegCpy <<= (Dst >>= Ident) * (Src >>= Ident))
+    | (Meta <<= (Placeholder | RegMap | FuncMap ))
       // Create a new value.
       | (RegMap <<= Ident * (Type >>= Ti32 | Ti1) * IRValue)
-      // Copy current block to `Ident`.
-      | (BlockCpy <<= Label)
       // Map the temporary id `Ident` to function name `Fun`.
       | (FuncMap <<= Ident * (Fun >>= Ident))
     // Real wf begins.
@@ -265,6 +261,7 @@ namespace miniml{
     | (FunDef <<= Ident * (Type >>= wf_llvm_types) * (Param >>= Ident))
       | (Param <<= Ident * (Type >>= wf_llvm_types))
     | (TypeArrow <<= (Ty1 >>= wf_llvm_types) * (Ty2 >>= wf_llvm_types))
+    | (Ident <<= (Alloca)++)
     ;
   }
 

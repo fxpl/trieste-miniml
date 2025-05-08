@@ -47,8 +47,8 @@ namespace miniml {
   inline const auto Equals = TokenDef("=");
 
   // Functions
-  inline const auto Fun =
-    TokenDef("fun", flag::symtab | flag::print); // binds its argument to its symtab
+  inline const auto Fun = TokenDef(
+    "fun", flag::symtab | flag::print); // binds its argument to its symtab
   inline const auto FunDef = TokenDef("fundef", flag::lookup | flag::shadowing);
   inline const auto Param = TokenDef("param", flag::lookup | flag::shadowing);
   inline const auto Annotation = TokenDef("t_annotation");
@@ -93,16 +93,19 @@ namespace miniml {
   /**
    * LLVM IR tokens
    */
+  // Closure instructions go here
+  inline const auto Placeholder = TokenDef("placeholder");
+
   inline const auto Compile = TokenDef("compile");
 
   inline const auto Instr = TokenDef("instr");
   inline const auto Label = TokenDef("label", flag::print);
   inline const auto Block = TokenDef("basic_block", flag::print);
   inline const auto IRFun = TokenDef("ir_function", flag::print);
-  
+
   // BinaryOps
   inline const auto BinaryOp = TokenDef("binary_op");
-  
+
   // MemoryOps
   inline const auto MemoryOp = TokenDef("memory_op");
   inline const auto Alloca = TokenDef("alloca");
@@ -128,7 +131,7 @@ namespace miniml {
   inline const auto FuncMap = TokenDef("func_map");
   inline const auto BlockMap = TokenDef("block_map");
   inline const auto BlockCpy = TokenDef("block_cpy");
-  
+
   // LLVM IR Types
   inline const auto Ti32 = TokenDef("i32");
   inline const auto Ti1 = TokenDef("i1");
@@ -147,7 +150,7 @@ namespace miniml {
   inline const auto SGE = TokenDef("sge");
   inline const auto SLT = TokenDef("slt");
   inline const auto SLE = TokenDef("sle");
-  
+
   // Helpers
   inline const auto Predecessor = TokenDef("predecessor");
   inline const auto Prev = TokenDef("prev");

@@ -48,7 +48,7 @@ namespace miniml {
 
   // Functions
   inline const auto Fun = TokenDef(
-    "fun", flag::symtab | flag::print); // binds its argument to its symtab
+    "fun", flag::symtab); // binds its argument to its symtab
   inline const auto FunDef = TokenDef("fundef", flag::lookup | flag::shadowing);
   inline const auto Param = TokenDef("param", flag::lookup | flag::shadowing);
   inline const auto Annotation = TokenDef("t_annotation");

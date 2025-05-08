@@ -8,6 +8,27 @@ namespace miniml {
 
   using namespace trieste;
 
+  enum IdentType {
+    IDENT_REG,
+    IDENT_ALLOC,
+    IDENT_FUNC,
+  };
+
+  // Type of value allocated.
+  // Must match LLVM IR type.
+  enum AllocType {
+    ALLOC_NONE,
+    ALLOC_INT,
+    ALLOC_BOOL,
+  };
+
+  struct CompileContext {
+    std::map<std::string, IdentType> identifierType;
+    std::map<std::string, AllocType> allocationType;
+
+    ~CompileContext() {}
+  };
+
   /**
    * @brief
    *
@@ -22,6 +43,8 @@ namespace miniml {
    *
    */
   PassDef compile() {
+    auto context = std::make_shared<CompileContext>();
+
     return {
       "compile",
       LLVMIRCompilation::wf,
@@ -96,15 +119,9 @@ namespace miniml {
         T(Compile) << T(Ident)[Result] *
               (T(Let)[Let] << T(Ident)[Ident] *
                  (T(Type) << (T(ForAllTy)[Type])) * T(Expr)[Expr]) >>
-          [](Match& _) -> Node {
+          [context](Match& _) -> Node {
           // FIXME: Debug print
           std::cout << "Let" << std::endl;
-
-          // TODO: Let now stores it on the stack and then loads it into a
-          // register. Should probably just store it and use another token as
-          // Identifier so it is translated into a load before use.
-
-          Node tmpPtr = Ident ^ _(Let)->fresh();
 
           // TODO: Need to deal with ForAllTy. Until I figure out how, just
           // pretend it cannot be nested and ignore it.
@@ -115,9 +132,16 @@ namespace miniml {
             return err(_(Type), "let type not supported");
           }
 
-          // Bind expr to both Ident and Dst
-          return Seq << (Compile << _(Ident) << _(Expr))
-                     << (Meta << (RegCpy << _(Result) << _(Ident)->clone()));
+          context->identifierType[node_val(_(Ident))] = IDENT_ALLOC;
+
+          // TODO: Might need to handle functions differently.
+          return Seq << (Instr
+                         << (MemoryOp << (Alloca << _(Ident) << llvmType)))
+                     << (Compile << _(Result) << _(Expr))
+                     << (Instr
+                         << (MemoryOp
+                             << (Store << _(Result)->clone()
+                                       << _(Ident)->clone())));
         },
 
         /**
@@ -158,12 +182,21 @@ namespace miniml {
         /**
          * Identifier
          */
-        T(Compile) << T(Ident)[Dst] * (T(Expr) << T(Type) * T(Ident)[Src]) >>
-          [](Match& _) -> Node {
-          // FIXME: This is required to handle programs that end in :
-          // let x = 3;;
-          // x;;
-          return Meta << (RegCpy << _(Dst) << _(Src));
+        T(Compile)
+            << (T(Ident)[Result] *
+                (T(Expr) << (T(Type)[Type] * T(Ident)[Ident]))) >>
+          [context](Match& _) -> Node {
+          auto type = context->identifierType[node_val(_(Ident))];
+
+          if (type == IDENT_ALLOC) {
+            auto llvmType = getLLVMType(_(Type) / Type);
+            assert(llvmType);
+
+            return Instr
+              << (MemoryOp << (Load << _(Result) << llvmType << _(Ident)));
+          } else {
+            return err(_(Ident), "identifier not found");
+          }
         },
 
         /**
@@ -389,7 +422,6 @@ namespace miniml {
 
           Node funBodyLabel = Label ^ ("funBody_" + funStr);
 
-          Node originBlock = Label ^ ("prevBlock_" + funStr);
           Node returnId = Ident ^ ("retVal_" + funStr);
 
           // -- need to bind the arguments of the function
@@ -403,25 +435,32 @@ namespace miniml {
           // Then a fun token should be lifted, containing the function body,
           // name and type. The lifted fun token is used by CodeGen pass to
           // declare function
+
+          // TODO: Long term plan:
+          // Create closure
+          // Lift function with reference to closure
+
           return Seq
+            << (Meta << Placeholder)
             // Create function body block.
-            // << (Lift << Top << (Meta << (BlockMap << funBodyLabel)))
             // Remember block where function was declared.
-            << (Meta << (BlockCpy << originBlock))
             // Tell code generator to create a function: its type, name, param.
-            << (FunDef << _(Ident) << funType << (_(Param) / Ident))
-            // Bind function to its internal name.
-            << (Meta << (FuncMap << f << _(Ident)->clone()))
-            // Set builder insertion point to function body.
-            // << (Lift << Top << (Label << funBodyLabel->clone()))
-            // TODO: Need to bind the block to the function.
-            << (Compile << returnId << _(Expr))
-            // MiniML has implicit return so must insert it here.
-            << (Instr << (TerminatorOp << (Ret << returnId->clone())))
-            // TODO: Pop current function.
-            //       (So any future blocks does not belong to this function)
-            // Reset IR builder insertion point.
-            << (Label ^ node_val(originBlock));
+            << (Lift << Program
+                     << ((IRFun ^ funStr)
+                         << (FunDef << _(Ident) << funType
+                                    << (_(Param) / Ident))
+                         // Bind function to its internal name.
+                         << (Meta << (FuncMap << f << _(Ident)->clone()))
+                         // Set builder insertion point to function body.
+                         // << (Lift << Top << (Label << funBodyLabel->clone()))
+                         // TODO: Need to bind the block to the function.
+                         << (Compile << returnId << _(Expr))
+                         // MiniML has implicit return so must insert it here.
+                         << (Instr
+                             << (TerminatorOp << (Ret << returnId->clone())))));
+          // TODO: Pop current function.
+          //       (So any future blocks does not belong to this function)
+          // Reset IR builder insertion point.
         },
 
         /**

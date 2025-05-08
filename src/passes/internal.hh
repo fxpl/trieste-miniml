@@ -228,17 +228,16 @@ namespace miniml{
     
     inline const auto wf =
     (Top <<= Ident * Program)
-    | (Program <<= (Instr | Label | FunDef | Meta)++)
+    | (Program <<= (IRFun)++[1])
+    | (IRFun <<= (Instr | Label | FunDef | Meta)++[1])
     // Meta operations to handle LLVM IR limitations.
     | (Meta <<= (RegCpy | RegMap | FuncMap | BlockMap | BlockCpy))
       // RegCpy copy the value from Src to Dst.
       | (RegCpy <<= (Dst >>= Ident) * (Src >>= Ident))
       // Create a new value.
       | (RegMap <<= Ident * (Type >>= Ti32 | Ti1) * IRValue)
-      // Create a new block.
-      | (BlockMap <<= Ident)
       // Copy current block to `Ident`.
-      | (BlockCpy <<= Ident)
+      | (BlockCpy <<= Label)
       // Map the temporary id `Ident` to function name `Fun`.
       | (FuncMap <<= Ident * (Fun >>= Ident))
     // Real wf begins.
@@ -257,16 +256,23 @@ namespace miniml{
       | (Phi <<= (Result >>= Ident) * (Type >>= wf_llvm_types) * Predecessor)
         // TODO: Can probably organise better.
         | (Predecessor <<= Prev++)
-          | (Prev <<= (IRValue >>= Ident) * (Label >>= Ident))
+          | (Prev <<= (IRValue >>= Ident) * (Label >>= Label))
     | (TerminatorOp <<= (Branch | Jump | Ret))
-      | (Branch <<= (Cond >>= Ident) * (True >>= Ident) * (False >>= Ident))
-      | (Jump <<= (Label >>= Ident))
+      | (Branch <<= (Cond >>= Ident) * (True >>= Label) * (False >>= Label))
+      | (Jump <<= (Label))
       | (Ret <<= Ident)
       // TODO: From frontend, should be replaced by LLVM tokens.
-    | (Label <<= Ident)
     | (FunDef <<= Ident * (Type >>= wf_llvm_types) * (Param >>= Ident))
       | (Param <<= Ident * (Type >>= wf_llvm_types))
     | (TypeArrow <<= (Ty1 >>= wf_llvm_types) * (Ty2 >>= wf_llvm_types))
+    ;
+  }
+
+  namespace LLVMIRBlockify {
+
+    inline const auto wf = LLVMIRCompilation::wf
+    | (IRFun <<= (Block)++[1])
+    | (Block <<= (Instr | Label | FunDef | Meta)++[1])
     ;
   }
 
@@ -275,7 +281,7 @@ namespace miniml{
   inline const auto wf_operand = (Int | Ident);
 
   inline const auto wf =
-    LLVMIRCompilation::wf - Meta
+    LLVMIRBlockify::wf - Meta
     ;
       
     }

@@ -33,8 +33,6 @@ namespace miniml {
         In(Top) * Start * T(Program)[Program] * End >> [](Match& _) -> Node {
           Node result = Ident ^ _(Program)->fresh();
 
-          std::cout << "Compile Top" << std::endl;
-
           return (Compile << result << _(Program));
         },
 
@@ -43,7 +41,9 @@ namespace miniml {
          */
         T(Compile) << T(Ident)[Ident] * T(Program)[Program] >>
           [](Match& _) -> Node {
-          std::cout << "Compiling program" << std::endl;
+          // FIXME: Debug print
+          std::cout << "Compile" << std::endl;
+
           auto prog = _(Program);
 
           // Generate identifiers for each of the program's top expressions.
@@ -58,6 +58,13 @@ namespace miniml {
           Node topexpr = prog->at(prog->size() - 1);
           prog->replace_at(prog->size() - 1, (Compile << _(Ident) << topexpr));
 
+          // Create main function and move all the instructions into it.
+          Node mainFun = IRFun ^ "main";
+          Node entryPoint = Label ^ "entry";
+
+          auto topExpressions = *_(Program);
+          prog->erase(prog->begin(), prog->end());
+
           // TODO: Is this still a good idea?
           //
           //       Top
@@ -68,14 +75,20 @@ namespace miniml {
           //
           // Where Ident holds the identifier of the program return value.
 
-          return Seq << _(Ident)->clone() << prog;
+          return Seq << _(Ident)->clone()
+                     << (prog << (mainFun << entryPoint << topExpressions));
         },
 
         /**
          * Compile TopExpression.
          */
         T(Compile) << T(Ident)[Ident] * (T(TopExpr) << T(Expr, Let)[Expr]) >>
-          [](Match& _) -> Node { return (Compile << _(Ident) << _(Expr)); },
+          [](Match& _) -> Node {
+          // FIXME: Debug print
+          std::cout << "TopExpr" << std::endl;
+
+          return (Compile << _(Ident) << _(Expr));
+        },
 
         /**
          * Let
@@ -84,6 +97,9 @@ namespace miniml {
               (T(Let)[Let] << T(Ident)[Ident] *
                  (T(Type) << (T(ForAllTy)[Type])) * T(Expr)[Expr]) >>
           [](Match& _) -> Node {
+          // FIXME: Debug print
+          std::cout << "Let" << std::endl;
+
           // TODO: Let now stores it on the stack and then loads it into a
           // register. Should probably just store it and use another token as
           // Identifier so it is translated into a load before use.
@@ -157,6 +173,9 @@ namespace miniml {
               (T(Expr) << (T(Type) << T(TInt)[Type]) *
                  (T(Add, Sub, Mul)[BinaryOp] << T(Expr)[Lhs] * T(Expr)[Rhs])) >>
           [](Match& _) -> Node {
+          // FIXME: Debug print
+          std::cout << "BinOp" << std::endl;
+
           Node op = NULL;
           if (_(BinaryOp) == Add) {
             op = Add;
@@ -228,6 +247,9 @@ namespace miniml {
               (T(Expr)[Expr] << T(Type) *
                  (T(If) << T(Expr)[Cond] * T(Expr)[True] * T(Expr)[False])) >>
           [](Match& _) -> Node {
+          // FIXME: Debug print
+          std::cout << "If-then-else" << std::endl;
+
           Node type = get_type(_(Expr));
           Node llvmType = getLLVMType(type);
           if (type == nullptr) {
@@ -240,49 +262,53 @@ namespace miniml {
           Node ifFalseId = Ident ^ _(False)->fresh();
 
           std::string ifId = node_val(condId);
-          Node thenLabel = Ident ^ ("then" + ifId);
-          Node thenEndLabel = Ident ^ ("thenEnd" + ifId);
-          Node elseLabel = Ident ^ ("else" + ifId);
-          Node elseEndLabel = Ident ^ ("elseEnd" + ifId);
-          Node ifEndLabel = Ident ^ ("ifEnd" + ifId);
+          Node thenLabel = Label ^ ("then" + ifId);
+          Node thenEndLabel = Label ^ ("thenEnd" + ifId);
+          Node elseLabel = Label ^ ("else" + ifId);
+          Node elseEndLabel = Label ^ ("elseEnd" + ifId);
+          Node ifEndLabel = Label ^ ("ifEnd" + ifId);
 
+          // clang-format off
           return Seq
             << (Compile << condId << _(Cond))
-            // Generate blocks/labels
-            << (Meta << (BlockMap << thenLabel))
-            << (Meta << (BlockMap << thenEndLabel))
-            << (Meta << (BlockMap << elseLabel))
-            << (Meta << (BlockMap << elseEndLabel))
-            << (Meta << (BlockMap << ifEndLabel))
             // If
-
             << (Instr
                 << (TerminatorOp
-                    << (Branch << condId->clone() << thenLabel->clone()
+                    << (Branch << condId->clone() 
+                               << thenLabel->clone()
                                << elseLabel->clone())))
             // Then
-            << (Label << thenLabel->clone()) << (Compile << ifTrueId << _(True))
-            << (Instr << (TerminatorOp << (Jump << thenEndLabel->clone())))
+            << (thenLabel) 
+            << (Compile << ifTrueId->clone() << _(True))
+            << (Instr 
+                << (TerminatorOp 
+                    << (Jump << thenEndLabel->clone())))
             // "Landing" block so Phi unaffected by branching in Then/Else expr.
-            << (Label << thenEndLabel->clone())
-            << (Instr << (TerminatorOp << (Jump << ifEndLabel->clone())))
+            << (thenEndLabel)
+            << (Instr 
+                << (TerminatorOp 
+                    << (Jump << ifEndLabel->clone())))
             // Else
-            << (Label << elseLabel->clone())
-            << (Compile << ifFalseId << _(False))
-            << (Instr << (TerminatorOp << (Jump << elseEndLabel->clone())))
+            << (elseLabel) 
+            << (Compile << ifFalseId->clone() << _(False))
+            << (Instr 
+                << (TerminatorOp 
+                    << (Jump << elseEndLabel->clone())))
             // "Landing" block so Phi unaffected by branching in Then/Else expr.
-            << (Label << elseEndLabel->clone())
-            << (Instr << (TerminatorOp << (Jump << ifEndLabel->clone())))
+            << (elseEndLabel)
+            << (Instr 
+                << (TerminatorOp 
+                    << (Jump << ifEndLabel->clone())))
             // ifEnd
-            << (Label << ifEndLabel->clone())
+            << (ifEndLabel)
             << (Instr
                 << (MiscOp
                     << (Phi
                         << _(Ident) << llvmType
-                        << (Predecessor << (Prev << ifTrueId->clone()
-                                                 << thenEndLabel->clone())
-                                        << (Prev << ifFalseId->clone()
-                                                 << elseEndLabel->clone())))));
+                        << (Predecessor
+                            << (Prev << ifTrueId << thenEndLabel->clone())
+                            << (Prev << ifFalseId << elseEndLabel->clone())))));
+          // clang-format on
         },
 
         /**
@@ -361,14 +387,22 @@ namespace miniml {
 
           std::string funStr = node_val(_(Ident));
 
-          Node funBodyLabel = Ident ^ ("funBody_" + funStr);
+          Node funBodyLabel = Label ^ ("funBody_" + funStr);
 
-          Node originBlock = Ident ^ ("prevBlock_" + funStr);
+          Node originBlock = Label ^ ("prevBlock_" + funStr);
           Node returnId = Ident ^ ("retVal_" + funStr);
 
           // -- need to bind the arguments of the function
           // -- here, any free variables?!
 
+          // TODO: This should create a closure where it is,
+          // allocating closure, populating it with function name and
+          // values of any free variables.
+          //
+          // FIXME: How to map free variables in fun to loads of closure?
+          // Then a fun token should be lifted, containing the function body,
+          // name and type. The lifted fun token is used by CodeGen pass to
+          // declare function
           return Seq
             // Create function body block.
             // << (Lift << Top << (Meta << (BlockMap << funBodyLabel)))
@@ -387,7 +421,7 @@ namespace miniml {
             // TODO: Pop current function.
             //       (So any future blocks does not belong to this function)
             // Reset IR builder insertion point.
-            << (Label << originBlock->clone());
+            << (Label ^ node_val(originBlock));
         },
 
         /**

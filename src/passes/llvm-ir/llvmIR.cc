@@ -38,7 +38,7 @@ namespace miniml {
     // Named variables, for keeping track of function arguments.
     std::map<std::string, Value*> namedVars;
     // Main function
-    llvm::Function* mainFunction;
+    llvm::Function* currentFunction;
 
     // Maps register identifiers to their LLVM IR values.
     std::map<std::string, Value*> registers;
@@ -311,8 +311,12 @@ namespace miniml {
             },
 
             // Label
-            T(Label) << T(Ident)[Ident] >> [context](Match& _) -> Node {
-              std::string blockId = node_val(_(Ident));
+            In(Block) * T(Label)[Label] >> [context](Match& _) -> Node {
+              // FIXME: Debug print
+              std::cout << "Label - Setting cursor at: " << node_val(_(Label))
+                        << std::endl;
+
+              std::string blockId = node_val(_(Label));
               llvm::BasicBlock* block = context->basicBlocks[blockId];
               assert(block);
 
@@ -327,8 +331,9 @@ namespace miniml {
             // Branch
             T(Instr)[Instr]
                 << (T(TerminatorOp)
-                    << (T(Branch) << T(Ident)[Cond] * T(Ident)[True] *
-                          T(Ident)[False])) >>
+                    << (T(Branch)
+                        << (T(Ident)[Cond] * T(Label)[True] *
+                            T(Label)[False]))) >>
               [context](Match& _) -> Node {
               std::string condId = node_val(_(Cond));
               Value* cond = context->registers[condId];
@@ -349,7 +354,7 @@ namespace miniml {
 
             // Jump
             T(Instr)[Instr]
-                << (T(TerminatorOp) << (T(Jump) << T(Ident)[Label])) >>
+                << (T(TerminatorOp) << (T(Jump) << (T(Label)[Label]))) >>
               [context](Match& _) -> Node {
               std::string blockId = node_val(_(Label));
               llvm::BasicBlock* block = context->basicBlocks[blockId];
@@ -376,8 +381,9 @@ namespace miniml {
             /**
              * Function declaration
              */
-            T(FunDef)[FunDef] << T(Ident)[Ident] * T(TypeArrow)[TypeArrow] *
-                  T(Ident)[Param] >>
+            T(FunDef)[FunDef]
+                << (T(Ident)[Ident] * T(TypeArrow)[TypeArrow] *
+                    T(Ident)[Param]) >>
               [context](Match& _) -> Node {
               // Create function type.
               // TODO: Convert trieste::token to llvm::type* in helper function.
@@ -442,7 +448,7 @@ namespace miniml {
               // Map function name to temporary identifier.
               context->functions[theFunctionName] = theFunctionName;
 
-              context->mainFunction = theFunction;
+              context->currentFunction = theFunction;
 
               return _(FunDef);
             },
@@ -458,7 +464,7 @@ namespace miniml {
               std::string src = node_val(_(Src));
               Value* srcVal = context->registers[src];
               assert(srcVal);
-              
+
               context->registers[dst] = srcVal;
 
               // Remove the meta node from the AST.
@@ -470,9 +476,10 @@ namespace miniml {
               [context](Match& _) -> Node {
               std::string tmpIdent = node_val(_(Ident));
               std::string functionName = node_val(_(Fun));
-              Function *theFunction = context->llvm_module.getFunction(functionName);
+              Function* theFunction =
+                context->llvm_module.getFunction(functionName);
               assert(theFunction);
-          
+
               context->registers[tmpIdent] = theFunction;
 
               // Remove the meta node from the AST.
@@ -480,10 +487,16 @@ namespace miniml {
             },
 
             // Map the temporary `Ident` to Value* `IRValue`.
+
             T(Meta)
-                << (T(RegMap) << T(Ident)[Ident] * T(Ti32, Ti1)[Type] *
-                      T(IRValue)[IRValue]) >>
+                << (T(RegMap)
+                    << (T(Ident)[Ident] * T(Ti32, Ti1)[Type] *
+                        T(IRValue)[IRValue])) >>
               [context](Match& _) -> Node {
+              // FIXME: debug print
+              std::cout << "Meta - Creating value at: " << node_val(_(Ident))
+                        << "\n";
+
               std::string regId = node_val(_(Ident));
               std::string valueStr = node_val(_(IRValue));
 
@@ -503,27 +516,29 @@ namespace miniml {
             },
 
             // Create Basic Block
-            T(Meta) << (T(BlockMap) << T(Ident)[Ident]) >>
-              [context](Match& _) -> Node {
-              std::string blockId = node_val(_(Ident));
+            In(IRFun) * T(Block)[Block] >> [context](Match& _) -> Node {
+              // FIXME: debug print
+              std::cout << "Block - Creating block: " << node_val(_(Block))
+                        << "\n";
 
-              // TODO: How to keep track of parent when this is in the body of a
-              // function!?
-              // What if context->mainFunction is a stack and we always just
-              // reference the top?
+              std::string funName = node_val(_(Block)->parent());
+              Function* function = context->llvm_module.getFunction(funName);
+              assert(function);
+              context->currentFunction = function;
+
+              std::string blockId = node_val(_(Block));
               BasicBlock* block = BasicBlock::Create(
-                context->llvm_context, blockId, context->mainFunction);
+                context->llvm_context, blockId, context->currentFunction);
 
               context->basicBlocks[blockId] = block;
 
-              // Remove the meta node from the AST.
-              return {};
+              return _(Block);
             },
 
             // Assign temporary identifier to current Basic Block.
-            T(Meta) << (T(BlockCpy) << T(Ident)[Ident]) >>
+            T(Meta) << (T(BlockCpy) << T(Label)[Label]) >>
               [context](Match& _) -> Node {
-              context->basicBlocks[node_val(_(Ident))] =
+              context->basicBlocks[node_val(_(Label))] =
                 context->builder.GetInsertBlock();
 
               // Remove the meta node from the AST.
@@ -547,21 +562,22 @@ namespace miniml {
       FunctionType* mainFuncType =
         FunctionType::get(Type::getInt32Ty(context->llvm_context), false);
 
-      context->mainFunction = Function::Create(
+      context->currentFunction = Function::Create(
         mainFuncType,
         Function::LinkageTypes::ExternalLinkage,
         "main",
         context->llvm_module);
 
-      BasicBlock* entry = BasicBlock::Create(
-        context->llvm_context, "entry", context->mainFunction);
+      // BasicBlock* entry = BasicBlock::Create(
+      //   context->llvm_context, "entry", context->currentFunction);
 
-      context->builder.SetInsertPoint(entry);
+      // context->builder.SetInsertPoint(entry);
 
       return 0;
     });
 
     pass.post([context](Node) {
+      // TODO: How to make sure this return is inserted at the end of main?
       Value* result = context->result;
       assert(result);
 

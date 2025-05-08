@@ -17,7 +17,9 @@
 #include "typecheck/resolve_print.cc"
 
 #include "llvm-ir/compile.cc"
+#include "llvm-ir/blockify.cc"
 #include "llvm-ir/llvmIR.cc"
+#include "llvm-ir/reverse_blocks.cc"
 // clang-format on
 
 namespace miniml {
@@ -50,7 +52,15 @@ namespace miniml {
       resolve_print(),
 
       // LLVM IR generation
+      // Create a linear stream of instructions.
       compile(),
+
+      // Structure instructions as leaves in a tree of functions and blocks.
+      blockify(),
+
+      // Reverse the order of blocks in functions.
+      reverse_blocks(),
+
       generateLLVMIR(),
     };
   }

@@ -218,4 +218,15 @@ namespace miniml {
       return ty->clone();
     }
   }
+
+  Node findClosestAncestor(Node node, Node ancestorType) {
+    Node current = node;
+    while (current != nullptr) {
+      if (current->type() == ancestorType->type()) {
+        return current;
+      }
+      current = current->parent();
+    }
+    return nullptr;
+  }
 }

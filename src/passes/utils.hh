@@ -1,20 +1,19 @@
 #pragma once
 #include "../miniml-lang.hh"
 
-namespace miniml
-{
+namespace miniml {
   using namespace ::trieste;
   using Subst = std::map<std::string, Node>;
 
-  //a few helper patterns
-  inline const auto expr_binOp = T(Mul,Add,Sub,Equals,LT);
-  inline const auto expr_keywords = T(If,Then,Else);
-  inline const auto expr_const = T(Int,True,False);
-  inline const auto type = T(TInt,TBool,TVar,TypeArrow);
+  // a few helper patterns
+  inline const auto expr_binOp = T(Mul, Add, Sub, Equals, LT);
+  inline const auto expr_keywords = T(If, Then, Else);
+  inline const auto expr_const = T(Int, True, False);
+  inline const auto type = T(TInt, TBool, TVar, TypeArrow);
 
-  Node err(const NodeRange &r, const std::string &msg);
+  Node err(const NodeRange& r, const std::string& msg);
 
-  Node err(Node node, const std::string &msg);
+  Node err(Node node, const std::string& msg);
 
   std::string node_val(Node node);
 
@@ -44,7 +43,6 @@ namespace miniml
   Node inst_constraint(Node ty1, Node ty2, Node origin);
   Node gen_constraint(Node ty1, Node ty2, Node origin);
 
-
   Node lift_constraint(Node n);
 
   Node lift_constraints(std::vector<Node> nodes);
@@ -59,4 +57,14 @@ namespace miniml
 
   Node instantiate(Node ty);
 
+  /**
+   * Finds the closest ancestor of a given type in the AST.
+   *
+   * @param node Node to start searching from.
+   * @param ancestorType Type of the ancestor to find.
+   *
+   * @returns the closest ancestor node of the given type,
+   * or nullptr if no ancestor of that type was found.
+   */
+  Node findClosestAncestor(Node node, Node ancestorType);
 }

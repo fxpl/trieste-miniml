@@ -180,10 +180,20 @@ namespace miniml{
 
     }
 
+    namespace closures{
+    
+      inline const auto wf_freeVars = 
+        check::wf
+        | (FunDef <<= Ident * Type * Param * Expr * FreeVarList)[Ident]
+        | (FreeVarList <<= FreeVar++)
+        | (FreeVar <<= Ident * Type)
+        ;
+    }
+
   namespace LLVMIRCompilation{
 
     // FIXME: Only for reference.
-    //        Manually unfolderd WF from typechecker
+    //        Manually unfolded WF from typechecker
     inline const auto wf_fresh =
     (Top <<= File)
     | (File <<= Program)
@@ -231,7 +241,7 @@ namespace miniml{
     | (Program <<= (IRFun)++[1])
     | (IRFun <<= (Instr | Label | FunDef | Meta)++[1])
     // Meta operations to handle LLVM IR limitations.
-    | (Meta <<= (Placeholder | RegMap | FuncMap ))
+    | (Meta <<= ( RegMap | FuncMap ))
       // Create a new value.
       | (RegMap <<= Ident * (Type >>= Ti32 | Ti1) * IRValue)
       // Map the temporary id `Ident` to function name `Fun`.

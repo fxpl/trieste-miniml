@@ -93,9 +93,6 @@ namespace miniml {
   /**
    * LLVM IR tokens
    */
-  // Closure instructions go here
-  inline const auto Placeholder = TokenDef("placeholder");
-
   inline const auto Compile = TokenDef("compile");
 
   inline const auto Instr = TokenDef("instr");
@@ -159,4 +156,8 @@ namespace miniml {
   inline const auto Src = TokenDef("src");
   inline const auto Dst = TokenDef("dst");
   inline const auto Result = TokenDef("result");
+
+  // Closure implementation
+  inline const auto FreeVarList = TokenDef("free_var_list");
+  inline const auto FreeVar = TokenDef("free_variable");
 }

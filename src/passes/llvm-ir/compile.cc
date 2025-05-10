@@ -441,7 +441,7 @@ namespace miniml {
           // Lift function with reference to closure
 
           return Seq
-            << (Meta << Placeholder)
+            // TODO: Wait for closures to be done
             // Create function body block.
             // Remember block where function was declared.
             // Tell code generator to create a function: its type, name, param.

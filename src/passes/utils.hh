@@ -57,14 +57,4 @@ namespace miniml {
 
   Node instantiate(Node ty);
 
-  /**
-   * Finds the closest ancestor of a given type in the AST.
-   *
-   * @param node Node to start searching from.
-   * @param ancestorType Type of the ancestor to find.
-   *
-   * @returns the closest ancestor node of the given type,
-   * or nullptr if no ancestor of that type was found.
-   */
-  Node findClosestAncestor(Node node, Node ancestorType);
 }

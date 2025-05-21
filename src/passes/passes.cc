@@ -16,6 +16,9 @@
 #include "typecheck/solve_constraints.cc"
 #include "typecheck/resolve_print.cc"
 
+#include "llvm-ir/free_variables.cc"
+#include "llvm-ir/main_function.cc"
+#include "llvm-ir/closure_conversion.cc"
 #include "llvm-ir/compile.cc"
 #include "llvm-ir/blockify.cc"
 #include "llvm-ir/llvmIR.cc"
@@ -52,15 +55,12 @@ namespace miniml {
       resolve_print(),
 
       // LLVM IR generation
-      // Create a linear stream of instructions.
+      free_variables(),
+      main_function(),
+      closure_conversion(),
       compile(),
-
-      // Structure instructions as leaves in a tree of functions and blocks.
       blockify(),
-
-      // Reverse the order of blocks in functions.
       reverse_blocks(),
-
       generateLLVMIR(),
     };
   }

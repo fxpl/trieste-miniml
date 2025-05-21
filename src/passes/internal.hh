@@ -188,6 +188,26 @@ namespace miniml{
         | (FreeVarList <<= FreeVar++)
         | (FreeVar <<= Ident * Type)
         ;
+
+      inline const auto wf_functions =
+        wf_freeVars
+        | (Program <<= IRFun++)
+        | (IRFun <<= Ident * Type * ParamList * Env * Body)
+        | (ParamList <<= Param++)
+        | (Body <<= TopExpr++)
+        ;
+
+      
+      inline const auto wf =
+        wf_functions
+        | (Program <<= (Env | IRFun)++[1])
+        | (Env <<= Type++)
+        | (Body <<= (TopExpr | Expr)++)
+        | (TopExpr <<= (Let | Expr))
+        | (Expr <<= Type * (Expr >>= (wf_expr | Closure)))
+        | (Closure <<= (Fun >>= Ident) * (Env >>= Ident) * FreeVarList)
+        | (Type <<= (Type >>= wf_types | ForAllTy | TPtr))
+        ;
     }
 
   namespace LLVMIRCompilation{

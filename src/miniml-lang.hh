@@ -132,6 +132,9 @@ namespace miniml {
   // LLVM IR Types
   inline const auto Ti32 = TokenDef("i32");
   inline const auto Ti1 = TokenDef("i1");
+  inline const auto Ti32 = TokenDef("i32");
+  inline const auto Ti64 = TokenDef("i64");
+  inline const auto TPtr = TokenDef("pointer");
 
   // Comparison operations
   inline const auto Comp = TokenDef("comp");
@@ -160,4 +163,9 @@ namespace miniml {
   // Closure implementation
   inline const auto FreeVarList = TokenDef("free_var_list");
   inline const auto FreeVar = TokenDef("free_variable");
+  inline const auto Env = TokenDef("env", flag::print);
+  inline const auto ParamList = TokenDef("param_list");
+  inline const auto Closure = TokenDef("closure", flag::print);
+  inline const auto Body = TokenDef("body");
+  inline const auto IRTypeList = TokenDef("ir_type_list");
 }

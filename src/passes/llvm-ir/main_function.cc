@@ -1,0 +1,41 @@
+#include "../../miniml-lang.hh"
+#include "../internal.hh"
+#include "../llvm_utils.hh"
+#include "../utils.hh"
+#include "trieste/token.h"
+
+namespace miniml {
+
+  using namespace trieste;
+
+  /**
+   * Inserts program into body of function "main",
+   * required by LLVM
+   */
+  PassDef main_function() {
+    return {
+      "main_function",
+      closures::wf_functions,
+      dir::topdown | dir::once,
+      {
+        In(Top) * (T(Program)[Program] << (Any++)[TopExpr]) >>
+          [](Match& _) -> Node {
+          Node main = IRFun ^ "main";
+
+          auto children = *_(Program);
+          _(Program)->erase(_(Program)->begin(), _(Program)->end());
+
+          // clang-format off
+          return _(Program)
+            << (main << Ident
+                     // TODO: Fix realistic typing: main(void) -> i32
+                     << (Type << (TypeArrow << TInt << TInt))
+                     << ParamList
+                     << Env
+                     << (Body << children));
+          // clang-format on
+        },
+
+      }};
+  }
+}

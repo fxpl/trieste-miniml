@@ -29,16 +29,15 @@ namespace miniml {
       {
         // Find free variables and their function definition.
         In(Expr) * T(Ident)[Ident] >> [context](Match& _) -> Node {
-          // FIXME: debug print
-          std::cout << "Ident: " << node_val(_(Ident)) << std::endl;
-
-          Node ancestor = findClosestAncestor(_(Ident), FunDef);
+          Node ancestor = _(Ident)->parent(FunDef);
           if (ancestor != nullptr) {
             // Ensures FunDef nodes without free variables are in the map.
             if (!context->freeVars.contains(ancestor)) {
               context->freeVars[ancestor];
             }
 
+            // TODO: _(Token)->scope() // Returns enclosing node with symbol
+            // table
             auto defs = _(Ident)->lookup();
             if (!defs.empty()) {
               auto def = defs.front();

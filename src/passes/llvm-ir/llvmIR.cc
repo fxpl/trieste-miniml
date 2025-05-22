@@ -785,7 +785,20 @@ namespace miniml {
       return 0;
     });
 
-      // context->builder.SetInsertPoint(entry);
+    pass.pre(IRFun, [context](Node functionToken) {
+      context->registers.clear();
+      std::string funId = node_val(functionToken);
+      llvm::Function* function = context->llvm_module.getFunction(funId);
+
+      Argument* arg = function->arg_begin();
+      Node paramList = functionToken / ParamList;
+      for (size_t i = 0; i < paramList->size(); i++) {
+        Node param = paramList->at(i);
+        std::string paramName = node_val(param / Ident);
+        arg->setName(paramName);
+        context->registers[paramName] = arg;
+        arg++;
+      }
 
       return 0;
     });

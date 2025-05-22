@@ -330,34 +330,32 @@ namespace miniml {
         },
 
         /**
-         * Apply Print
+         * Function Call
          */
-        // FIXME: This must preceed Apply rewrite rule, should employ neg. lookahead!
-        T(Compile) << T(Ident)[Ident] *
-              (T(Expr) << (T(Type) << T(TInt, TBool)) *
-                 (T(App) << (T(Expr)[Fun] << (T(Type) * T(Print))) *
-                    T(Expr)[Param])) >>
+        T(Compile) << T(Ident)[Result] *
+              (T(Expr) << (T(Type)) *
+                 (T(FunCall) << (T(Expr)[Fun]) * T(Expr)[Param])) >>
           [](Match& _) -> Node {
           Node argIdent = Ident ^ _(Param)->fresh();
           Node funIdent = Ident ^ _(Fun)->fresh();
 
           // FIXME: debug print
-          std::cout << "Compile - Apply Print" << std::endl;
+          std::cout << "Compile - Function Call" << std::endl;
 
           return Seq << (Compile << argIdent->clone() << _(Param))
                      << (Compile << funIdent->clone() << _(Fun))
                      << (Instr
                          << (MiscOp
-                             << (Call << _(Ident) << funIdent
+                             << (Call << _(Result) << funIdent
                                       << (ArgList << argIdent))));
         },
 
         /**
-         * Apply
+         * Closure Call
          */
         T(Compile) << T(Ident)[Result] *
-              (T(Expr) << (T(Type) << T(TInt, TBool)) *
-                 (T(App) << (T(Expr)[Fun]) * T(Expr)[Param])) >>
+              (T(Expr) << (T(Type)) *
+                 (T(ClosureCall) << (T(Expr)[Fun]) * T(Expr)[Param])) >>
           [](Match& _) -> Node {
           // FIXME: This treats all functions as if they are closures,
           // not sure how to deal with print.
@@ -459,14 +457,7 @@ namespace miniml {
           std::cout << "compiling function: " << node_val(_(IRFun))
                     << std::endl;
 
-          // When compiling a function we need to
-          // - create function type
-          // TODO: How to deal with t_var? LLVM IR is strongly typed..
-          // TODO: if type is TVar, then we need to create a function for each
-          // type.
-          // TODO: figure out how to identify which type to call when evaluating
-          // the call.
-          // FIXME: Just ignore TVar for now.
+          // TODO: Support polymorphism (Tvar)
           Node type = _(Type) / Type;
           Node paramType = getLLVMType(type / Ty1);
           Node returnType = getLLVMType(type / Ty2);
@@ -475,19 +466,13 @@ namespace miniml {
 
           Node funType = TypeArrow << paramType << returnType;
 
-          // TODO: Deal with function naming. example:
-          // Both ´node_val(IRfun)' and ´f´(Fun) point to same function.
-          // But f is only inside the scope of the function.
+          // TODO: Deal with functions identifier, i.e. `f` in `fun f (x) is
+          // x;;`
           std::string uniqueId = std::string(_(IRFun)->fresh().view());
           Node entryPoint = Label ^ ("entry_" + uniqueId);
           Node returnId = Ident ^ ("ret_" + uniqueId);
 
-          // -- need to bind the arguments of the function
-          // -- here, any free variables?!
-          // FIXME: How to map free variables in fun to loads of closure?
-          // Then a fun token should be lifted, containing the function body,
-          // name and type. The lifted fun token is used by CodeGen pass to
-          // declare function
+          // TODO: Add free variables to environment
 
           if ("main" == node_val(_(IRFun))) {
             return Seq
@@ -498,7 +483,7 @@ namespace miniml {
                       // TODO: Instructions for loading from environment here
                       // FIXME: We need the free variable list to create
                       // those instructions :/
-                      // FIXME: Main can contain multiple expressions!
+                      // main() may contain multiple expressions.
                       << (Compile << (TODO << _[Expr]))
                       // main() expected to return 0 for program success.
                       << (Action
@@ -542,7 +527,7 @@ namespace miniml {
           std::cout << env->size() << std::endl;
 
           for (size_t i = 0; i < env->size(); i++) {
-            Node type = _(Env)->at(i);
+            Node type = env->at(i);
             env->replace_at(i, (Compile << type));
           }
 
@@ -559,7 +544,7 @@ namespace miniml {
             << (T(Ident)[Result] *
                 (T(Expr)
                  << (T(Type) *
-                     (T(Closure)[Closure]
+                     (T(CreateClosure)[CreateClosure]
                       << (T(Ident)[Fun] * T(Env)[Env] *
                           (T(FreeVarList)[FreeVarList])))))) >>
           [](Match& _) -> Node {
@@ -571,12 +556,12 @@ namespace miniml {
           // FIXME: Assumes a ptr is i64 = 8 Bytes.
           size_t closureByteCount = 20;
           Node closureBytesValue = IRValue ^ std::to_string(closureByteCount);
-          Node closureBytes = Ident ^ _(Closure)->fresh();
+          Node closureBytes = Ident ^ _(CreateClosure)->fresh();
           // Node closurePtr = Ident ^ _(Closure)->fresh();
           Node closurePtr = _(Result);
           Node closureTy = Ident ^ "ClosureTy";
 
-          std::string uniqueId = std::string(_(Closure)->fresh().view());
+          std::string uniqueId = std::string(_(CreateClosure)->fresh().view());
 
           Node envSlotPtr = Ident ^ "envSlot_" + uniqueId;
           Node envPtr = Ident ^ "envPtr_" + uniqueId;
@@ -623,7 +608,7 @@ namespace miniml {
             size_t envByteCount = 4;
 
             Node envBytesValue = IRValue ^ std::to_string(envByteCount);
-            Node envBytes = Ident ^ _(Closure)->fresh();
+            Node envBytes = Ident ^ _(CreateClosure)->fresh();
             Node envTy = Ident ^ node_val(_(Env));
 
             return Seq

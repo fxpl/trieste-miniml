@@ -210,8 +210,10 @@ namespace miniml{
         | (Env <<= Type++)
         | (Body <<= (TopExpr | Expr)++)
         | (TopExpr <<= (Let | Expr))
-        | (Expr <<= Type * (Expr >>= (wf_expr | Global | Closure)))
-        | (Closure <<= (Fun >>= Ident) * Env * FreeVarList)
+        | (Expr <<= Type * (Expr >>= ((wf_expr - App) | Global | CreateClosure | ClosureCall | FunCall)))
+          | (CreateClosure <<= (Fun >>= Ident) * Env * FreeVarList)
+          | (FunCall <<= (Lhs >>= Expr) * (Rhs >>= Expr))
+          | (ClosureCall <<= (Lhs >>= Expr) * (Rhs >>= Expr))
         | (Type <<= (Type >>= wf_types | ForAllTy | TPtr))
         ;
     }
@@ -270,7 +272,7 @@ namespace miniml{
       | (ParamList <<= Param++)
         | (Param <<= Ident * (Type >>= wf_llvm_types))
       | (Body <<= (Instr | Label | Action)++[1])
-    // Builder actions which aren't LLVM IR instructions.
+    // Builder actions, which aren't LLVM IR instructions.
     | (Action <<= (CreateConst | CreateStructType | CreateFunType | GetFunction | GetType))
       | (CreateConst <<= Ident * (Type >>= Ti64 | Ti32 | Ti1) * IRValue)
       | (CreateStructType <<= Ident * IRTypeList)

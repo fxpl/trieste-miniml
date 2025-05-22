@@ -121,6 +121,10 @@ namespace miniml {
   inline const auto Icmp = TokenDef("icmp");
   inline const auto Phi = TokenDef("phi");
 
+  // ConversionOps
+  inline const auto ConversionOp = TokenDef("conversion_op");
+  inline const auto BitCast = TokenDef("bitcast");
+
   // Meta operations (Not apart of LLVM IR)
   inline const auto Meta = TokenDef("meta");
   inline const auto RegCpy = TokenDef("reg_cpy");
@@ -130,7 +134,7 @@ namespace miniml {
   inline const auto BlockCpy = TokenDef("block_cpy");
 
   // LLVM IR Types
-  inline const auto Ti32 = TokenDef("i32");
+  inline const auto IRType = TokenDef("ir_type");
   inline const auto Ti1 = TokenDef("i1");
   inline const auto Ti32 = TokenDef("i32");
   inline const auto Ti64 = TokenDef("i64");

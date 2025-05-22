@@ -163,6 +163,7 @@ namespace miniml {
   inline const auto Src = TokenDef("src");
   inline const auto Dst = TokenDef("dst");
   inline const auto Result = TokenDef("result");
+  inline const auto ArgList = TokenDef("argument_list");
 
   // Closure implementation
   inline const auto FreeVarList = TokenDef("free_var_list");

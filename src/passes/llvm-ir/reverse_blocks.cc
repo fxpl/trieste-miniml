@@ -29,23 +29,19 @@ namespace miniml {
   PassDef reverse_blocks() {
     return {
       "reverse_blocks",
-      // TODO: Use create WF
       LLVMIRBlockify::wf,
       (dir::topdown | dir::once),
       {
         /**
          * Reverse order of basic blocks in a function.
          */
-        T(IRFun)[IRFun] << T(Block)++ >> [](Match& _) -> Node {
-          // FIXME: debug print
-          std::cout << "Reverse" << std::endl;
-
-          auto children = *_(IRFun);
+        In(IRFun) * (T(Body)[Body] << T(Block)++) >> [](Match& _) -> Node {
+          auto children = *_(Body);
           std::reverse(children.begin(), children.end());
 
-          _(IRFun)->erase(_(IRFun)->begin(), _(IRFun)->end());
+          _(Body)->erase(_(Body)->begin(), _(Body)->end());
 
-          return _(IRFun) << children;
+          return _(Body) << children;
         },
 
       }};

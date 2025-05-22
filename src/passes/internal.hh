@@ -259,17 +259,26 @@ namespace miniml{
     
     inline const auto wf =
     (Top <<= Ident * Program)
-    | (Program <<= (IRFun)++[1])
-    | (IRFun <<= (Instr | Label | FunDef | Meta)++[1])
-    // Meta operations to handle LLVM IR limitations.
-    | (Meta <<= ( RegMap | FuncMap ))
-      // Create a new value.
-      | (RegMap <<= Ident * (Type >>= Ti32 | Ti1) * IRValue)
-      // Map the temporary id `Ident` to function name `Fun`.
-      | (FuncMap <<= Ident * (Fun >>= Ident))
-    // Real wf begins.
+    | (Program <<= (Action | IRFun)++[1])
+    | (IRFun <<= TypeArrow * ParamList * Body)
+      | (TypeArrow <<= (Ty1 >>= wf_llvm_types) * (Ty2 >>= wf_llvm_types))
+      | (ParamList <<= Param++)
+        | (Param <<= Ident * (Type >>= wf_llvm_types))
+      | (Body <<= (Instr | Label | Action)++[1])
+    // Builder actions which aren't LLVM IR instructions.
+    | (Action <<= (CreateConst | CreateStructType | CreateFunType | GetFunction | GetType))
+      | (CreateConst <<= Ident * (Type >>= Ti64 | Ti32 | Ti1) * IRValue)
+      | (CreateStructType <<= Ident * IRTypeList)
+        | (IRTypeList <<= wf_llvm_types++)
+      | (CreateFunType <<= (Result >>= Ident) * (IRType >>= wf_llvm_types) * IRTypeList)
+        | (IRTypeList <<= wf_llvm_types++)
+      | (GetFunction <<= (Result >>= Ident) * (Fun >>= Ident))
+      | (GetType <<= (Result >>= Ident) * (IRType >>= Ident))
+    // LLVM IR instructions.
     | (Instr <<= (BinaryOp | MemoryOp | TerminatorOp | MiscOp | ConversionOp))
     | (BinaryOp <<= (Add | Sub | Mul))
+    // TODO: Refactor so operands should be Ident or IRValue,
+    //       never `Int` in order to decouple this IR from MiniML.
       | (Add <<= (Result >>= Ident) * (Type >>= Ti32) * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
       | (Sub <<= (Result >>= Ident) * (Type >>= Ti32) * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
       | (Mul <<= (Result >>= Ident) * (Type >>= Ti32) * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
@@ -287,11 +296,6 @@ namespace miniml{
       | (Branch <<= (Cond >>= Ident) * (True >>= Label) * (False >>= Label))
       | (Jump <<= (Label))
       | (Ret <<= Ident)
-      // TODO: From frontend, should be replaced by LLVM tokens.
-    | (FunDef <<= Ident * (Type >>= wf_llvm_types) * (Param >>= Ident))
-      | (Param <<= Ident * (Type >>= wf_llvm_types))
-    | (TypeArrow <<= (Ty1 >>= wf_llvm_types) * (Ty2 >>= wf_llvm_types))
-    | (Ident <<= (Alloca)++)
     | (ConversionOp <<= (BitCast))
       | (BitCast <<= (Result >>= Ident) * (IRValue >>= Ident) * (IRType >>= (Ident | wf_llvm_types)))
     ;
@@ -300,8 +304,8 @@ namespace miniml{
   namespace LLVMIRBlockify {
 
     inline const auto wf = LLVMIRCompilation::wf
-    | (IRFun <<= (Block)++[1])
-    | (Block <<= (Instr | Label | FunDef | Meta)++[1])
+    | (Body <<= (Block)++[1])
+    | (Block <<= (Instr | Label | FunDef | Action)++[1])
     ;
   }
 
@@ -310,7 +314,7 @@ namespace miniml{
   inline const auto wf_operand = (Int | Ident);
 
   inline const auto wf =
-    LLVMIRBlockify::wf - Meta
+    LLVMIRBlockify::wf - Action
     ;
       
     }

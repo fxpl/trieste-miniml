@@ -17,12 +17,13 @@
 #include "typecheck/resolve_print.cc"
 
 #include "llvm-ir/free_variables.cc"
+#include "llvm-ir/globals.cc"
 #include "llvm-ir/main_function.cc"
 #include "llvm-ir/closure_conversion.cc"
 #include "llvm-ir/compile.cc"
 #include "llvm-ir/blockify.cc"
-#include "llvm-ir/llvmIR.cc"
 #include "llvm-ir/reverse_blocks.cc"
+#include "llvm-ir/llvmIR.cc"
 // clang-format on
 
 namespace miniml {
@@ -56,6 +57,7 @@ namespace miniml {
 
       // LLVM IR generation
       free_variables(),
+      globals(),
       main_function(),
       closure_conversion(),
       compile(),

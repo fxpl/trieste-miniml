@@ -8,24 +8,7 @@ namespace miniml {
 
   using namespace trieste;
 
-  enum IdentType {
-    IDENT_REG,
-    IDENT_ALLOC,
-    IDENT_FUNC,
-  };
-
-  // Type of value allocated.
-  // Must match LLVM IR type.
-  enum AllocType {
-    ALLOC_NONE,
-    ALLOC_INT,
-    ALLOC_BOOL,
-  };
-
   struct CompileContext {
-    std::map<std::string, IdentType> identifierType;
-    std::map<std::string, AllocType> allocationType;
-
     ~CompileContext() {}
   };
 
@@ -132,8 +115,6 @@ namespace miniml {
             return err(_(Type), "let type not supported");
           }
 
-          context->identifierType[node_val(_(Ident))] = IDENT_ALLOC;
-
           // TODO: Might need to handle functions differently.
           return Seq << (Instr
                          << (MemoryOp << (Alloca << _(Ident) << llvmType)))
@@ -186,17 +167,27 @@ namespace miniml {
             << (T(Ident)[Result] *
                 (T(Expr) << (T(Type)[Type] * T(Ident)[Ident]))) >>
           [context](Match& _) -> Node {
-          auto type = context->identifierType[node_val(_(Ident))];
+          auto llvmType = getLLVMType(_(Type) / Type);
+          assert(llvmType);
 
-          if (type == IDENT_ALLOC) {
-            auto llvmType = getLLVMType(_(Type) / Type);
-            assert(llvmType);
+          return Instr
+            << (ConversionOp << (BitCast << _(Result) << _(Ident) << llvmType));
+        },
 
-            return Instr
-              << (MemoryOp << (Load << _(Result) << llvmType << _(Ident)));
-          } else {
-            return err(_(Ident), "identifier not found");
-          }
+        /**
+         * Global
+         */
+        T(Compile)
+            << (T(Ident)[Result] *
+                (T(Expr) << (T(Type)[Type] * T(Global)[Global]))) >>
+          [context](Match& _) -> Node {
+          auto llvmType = getLLVMType(_(Type) / Type);
+          assert(llvmType);
+
+          return Instr
+            << (MemoryOp
+                << (Load << _(Result) << llvmType
+                         << (Ident ^ node_val(_(Global)))));
         },
 
         /**

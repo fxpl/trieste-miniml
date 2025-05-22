@@ -185,8 +185,9 @@ namespace miniml{
       inline const auto wf_freeVars = 
         check::wf
         | (FunDef <<= Ident * Type * Param * Expr * FreeVarList)[Ident]
-        | (FreeVarList <<= FreeVar++)
-        | (FreeVar <<= Ident * Type)
+          | (FreeVarList <<= FreeVar++)
+            | (FreeVar <<= (Ident >>= (Ident | Global)) * Type)
+        | (Expr <<= Type * (Expr >>= (wf_expr | Global)))
         ;
 
       inline const auto wf_functions =
@@ -204,8 +205,8 @@ namespace miniml{
         | (Env <<= Type++)
         | (Body <<= (TopExpr | Expr)++)
         | (TopExpr <<= (Let | Expr))
-        | (Expr <<= Type * (Expr >>= (wf_expr | Closure)))
-        | (Closure <<= (Fun >>= Ident) * (Env >>= Ident) * FreeVarList)
+        | (Expr <<= Type * (Expr >>= (wf_expr | Global | Closure)))
+        | (Closure <<= (Fun >>= Ident) * Env * FreeVarList)
         | (Type <<= (Type >>= wf_types | ForAllTy | TPtr))
         ;
     }
@@ -252,7 +253,7 @@ namespace miniml{
     // sle: signed less or equal
     // Unsigned
     inline const auto wf_comparison = (EQ | NE | UGT | UGE | ULT | ULE | SGT | SGE | SLT | SLE);
-    inline const auto wf_llvm_types = (Ti1 | Ti32 | TypeArrow); 
+    inline const auto wf_llvm_types = (Ti1 | Ti32 | Ti64 | TPtr | TypeArrow); 
 
     inline const auto wf_operand = (Int | Ident);
     
@@ -267,7 +268,7 @@ namespace miniml{
       // Map the temporary id `Ident` to function name `Fun`.
       | (FuncMap <<= Ident * (Fun >>= Ident))
     // Real wf begins.
-    | (Instr <<= (BinaryOp | MemoryOp | TerminatorOp | MiscOp))
+    | (Instr <<= (BinaryOp | MemoryOp | TerminatorOp | MiscOp | ConversionOp))
     | (BinaryOp <<= (Add | Sub | Mul))
       | (Add <<= (Result >>= Ident) * (Type >>= Ti32) * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
       | (Sub <<= (Result >>= Ident) * (Type >>= Ti32) * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
@@ -292,6 +293,8 @@ namespace miniml{
       | (Param <<= Ident * (Type >>= wf_llvm_types))
     | (TypeArrow <<= (Ty1 >>= wf_llvm_types) * (Ty2 >>= wf_llvm_types))
     | (Ident <<= (Alloca)++)
+    | (ConversionOp <<= (BitCast))
+      | (BitCast <<= (Result >>= Ident) * (IRValue >>= Ident) * (IRType >>= (Ident | wf_llvm_types)))
     ;
   }
 

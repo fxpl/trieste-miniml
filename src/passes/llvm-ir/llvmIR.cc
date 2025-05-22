@@ -379,7 +379,68 @@ namespace miniml {
             },
 
             /**
-             * Function declaration
+             * Conversion Operations
+             */
+            // BitCast (Custom Type)
+            T(Instr)
+                << (T(ConversionOp)
+                    << (T(BitCast) << T(Ident)[Result] * T(Ident)[IRValue] *
+                          T(Ident)[IRType])) >>
+              [context](Match& _) -> Node {
+              std::string targetTypeId = node_val(_(IRType));
+              llvm::Type* targetType = context->types[targetTypeId];
+              assert(targetType);
+
+              std::string valueToConvertId = node_val(_(IRValue));
+              Value* valueToConvert = context->registers[valueToConvertId];
+              assert(valueToConvert);
+
+              std::string resultId = node_val(_(Result));
+              Value* result = context->builder.CreateBitCast(
+                valueToConvert, targetType, resultId);
+              context->registers[resultId] = result;
+
+              // FIXME: debug print
+              std::cout << "ConversionOp - BitCast" << std::endl;
+
+              return {};
+            },
+
+            // BitCast (Fixed Type)
+            T(Instr)
+                << (T(ConversionOp)
+                    << (T(BitCast) << T(Ident)[Result] * T(Ident)[IRValue] *
+                          T(Ti1, Ti32, Ti64, TPtr)[IRType])) >>
+              [context](Match& _) -> Node {
+              llvm::Type* targetType = nullptr;
+              if (_(IRType) == Ti1) {
+                targetType = context->builder.getInt1Ty();
+              } else if (_(IRType) == Ti32) {
+                targetType = context->builder.getInt32Ty();
+              } else if (_(IRType) == Ti64) {
+                targetType = context->builder.getInt64Ty();
+              } else if (_(IRType) == TPtr) {
+                targetType = context->builder.getPtrTy();
+              }
+              assert(targetType);
+
+              std::string valueToConvertId = node_val(_(IRValue));
+              Value* valueToConvert = context->registers[valueToConvertId];
+              assert(valueToConvert);
+
+              std::string resultId = node_val(_(Result));
+              Value* result = context->builder.CreateBitCast(
+                valueToConvert, targetType, resultId);
+              context->registers[resultId] = result;
+
+              // FIXME: debug print
+              std::cout << "ConversionOp - BitCast" << std::endl;
+
+              return {};
+            },
+
+            /**
+             * Function Declaration
              */
             T(FunDef)[FunDef]
                 << (T(Ident)[Ident] * T(TypeArrow)[TypeArrow] *

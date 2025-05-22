@@ -71,6 +71,9 @@ namespace miniml {
     // Context shareable for all matches in the pass.
     auto context = std::make_shared<LLVMIRContext>();
 
+    // FIXME: Debug print
+    std::cout << "## CodeGen Pass ##" << std::endl;
+
     /**
      * Bottom up pass that "recursively" generates LLVM IR.
      * By traversing the child nodes before the parent, storing the instruction
@@ -121,6 +124,8 @@ namespace miniml {
               context->registers[resultId] = result;
               context->result = result;
 
+              std::cout << "BinaryOp - Add/Sub/Mul" << std::endl;
+
               return _(Instr);
             },
 
@@ -130,7 +135,8 @@ namespace miniml {
             // Alloca
             T(Instr)[Instr]
                 << (T(MemoryOp)
-                    << (T(Alloca) << T(Ident)[Ident] * (T(Ti32, Ti1)[Type]))) >>
+                    << (T(Alloca) << T(Ident)[Ident] *
+                          (T(Ti64, Ti32, Ti1, TPtr)[Type]))) >>
               [context](Match& _) -> Node {
               std::string resultId = node_val(_(Ident));
 
@@ -139,6 +145,10 @@ namespace miniml {
                 llvmType = context->builder.getInt32Ty();
               } else if (_(Type) == Ti1) {
                 llvmType = context->builder.getInt1Ty();
+              } else if (_(Type) == Ti64) {
+                llvmType = context->builder.getInt64Ty();
+              } else if (_(Type) == TPtr) {
+                llvmType = context->builder.getPtrTy();
               }
               assert(llvmType);
 
@@ -147,6 +157,8 @@ namespace miniml {
 
               context->registers[resultId] = result;
               context->result = result;
+
+              std::cout << "MemoryOp - Alloca" << std::endl;
 
               return _(Instr);
             },
@@ -166,13 +178,15 @@ namespace miniml {
 
               context->builder.CreateStore(value, dest);
 
+              std::cout << "MemoryOp - Store" << std::endl;
+
               return _(Instr);
             },
 
             // Load
             T(Instr)[Instr]
                 << (T(MemoryOp)
-                    << (T(Load) << T(Ident)[Ident] * T(Ti32, Ti1)[Type] *
+                    << (T(Load) << T(Ident)[Ident] * T(Ti32, Ti1, TPtr)[Type] *
                           T(Ident)[Src])) >>
               [context](Match& _) -> Node {
               // TODO: Handle other types
@@ -183,6 +197,8 @@ namespace miniml {
                 type = context->builder.getInt32Ty();
               } else if (_(Type) == Ti1) {
                 type = context->builder.getInt1Ty();
+              } else if (_(Type) == TPtr) {
+                type = context->builder.getPtrTy();
               }
               assert(type);
 
@@ -265,6 +281,8 @@ namespace miniml {
 
               context->registers[resultId] = result;
               context->result = result;
+
+              std::cout << "MiscOp - Compare" << std::endl;
 
               return _(Instr);
             },
@@ -354,6 +372,9 @@ namespace miniml {
 
               context->builder.CreateCondBr(cond, trueBlock, falseBlock);
 
+              std::cout << "TerminatorOp - Branch to blocks: " << trueId
+                        << " or " << falseId << std::endl;
+
               return _(Instr);
             },
 
@@ -367,6 +388,10 @@ namespace miniml {
 
               context->builder.CreateBr(block);
 
+              // FIXME: debug print
+              std::cout << "TerminatorOp - Jump to block: " << blockId
+                        << std::endl;
+
               return _(Instr);
             },
 
@@ -379,6 +404,8 @@ namespace miniml {
               assert(result);
 
               context->builder.CreateRet(result);
+
+              std::cout << "TerminatorOp - Return" << std::endl;
 
               return _(Instr);
             },
@@ -749,7 +776,7 @@ namespace miniml {
     context->registers[functionName] = theFunction;
 
     BasicBlock* functionEntryBlock =
-      BasicBlock::Create(context->llvm_context, "printIntBody", theFunction);
+      BasicBlock::Create(context->llvm_context, "entry", theFunction);
     context->builder.SetInsertPoint(functionEntryBlock);
 
     Argument* arg = theFunction->arg_begin();
@@ -787,7 +814,7 @@ namespace miniml {
     context->registers[functionName] = theFunction;
 
     BasicBlock* functionEntryBlock =
-      BasicBlock::Create(context->llvm_context, "printBoolBody", theFunction);
+      BasicBlock::Create(context->llvm_context, "entry", theFunction);
     context->builder.SetInsertPoint(functionEntryBlock);
 
     Argument* arg = theFunction->arg_begin();

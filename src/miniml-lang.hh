@@ -175,7 +175,9 @@ namespace miniml {
   inline const auto FreeVar = TokenDef("free_variable");
   inline const auto Env = TokenDef("env", flag::print);
   inline const auto ParamList = TokenDef("param_list");
-  inline const auto Closure = TokenDef("closure", flag::print);
+  inline const auto CreateClosure = TokenDef("create_closure", flag::print);
+  inline const auto ClosureCall = TokenDef("closure_call");
+  inline const auto FunCall = TokenDef("fun_call");
   inline const auto Body = TokenDef("body");
   inline const auto IRTypeList = TokenDef("ir_type_list");
 }

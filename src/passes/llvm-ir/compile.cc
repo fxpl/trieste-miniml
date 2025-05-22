@@ -330,20 +330,96 @@ namespace miniml {
         },
 
         /**
-         * Apply
+         * Apply Print
          */
+        // FIXME: This must preceed Apply rewrite rule, should employ neg. lookahead!
         T(Compile) << T(Ident)[Ident] *
               (T(Expr) << (T(Type) << T(TInt, TBool)) *
-                 (T(App) << (T(Expr)[Fun]) * T(Expr)[Param])) >>
+                 (T(App) << (T(Expr)[Fun] << (T(Type) * T(Print))) *
+                    T(Expr)[Param])) >>
           [](Match& _) -> Node {
           Node argIdent = Ident ^ _(Param)->fresh();
           Node funIdent = Ident ^ _(Fun)->fresh();
+
+          // FIXME: debug print
+          std::cout << "Compile - Apply Print" << std::endl;
 
           return Seq << (Compile << argIdent->clone() << _(Param))
                      << (Compile << funIdent->clone() << _(Fun))
                      << (Instr
                          << (MiscOp
-                             << (Call << _(Ident) << funIdent << argIdent)));
+                             << (Call << _(Ident) << funIdent
+                                      << (ArgList << argIdent))));
+        },
+
+        /**
+         * Apply
+         */
+        T(Compile) << T(Ident)[Result] *
+              (T(Expr) << (T(Type) << T(TInt, TBool)) *
+                 (T(App) << (T(Expr)[Fun]) * T(Expr)[Param])) >>
+          [](Match& _) -> Node {
+          // FIXME: This treats all functions as if they are closures,
+          // not sure how to deal with print.
+          Node argIdent = Ident ^ _(Param)->fresh();
+          Node funIdent = Ident ^ _(Param)->fresh();
+
+          // TODO: Need to create function type from the function's type
+          Node funRetTypeToken = _(Fun) / Type / Type / Ty1;
+          Node funArgTypeToken = _(Fun) / Type / Type / Ty2;
+          Node retLLVMType = getLLVMType(funRetTypeToken);
+          Node argLLVMType = getLLVMType(funArgTypeToken);
+
+          std::string uniqueId = std::string(_(Fun)->fresh().view());
+
+          Node closurePtr = Ident ^ "closPtr_" + uniqueId;
+          Node closureTy = Ident ^ "ClosureTy";
+
+          Node funSlotPtr = Ident ^ "funSlot_" + uniqueId;
+          Node funPtr = Ident ^ "funPtr_" + uniqueId;
+          Node funTy = Ident ^ "funType_" + uniqueId;
+
+          Node envSlotPtr = Ident ^ "envSlot_" + uniqueId;
+          Node envPtr = Ident ^ "envPtr_" + uniqueId;
+
+          return Seq
+            // Closure
+            << (Compile << closurePtr << _(Fun))
+            // Env
+            << (Instr
+                << (MemoryOp
+                    << (GetElementPtr
+                        << envSlotPtr << closureTy << closurePtr->clone()
+                        << (OffsetList
+                            << (Offset << Ti32 << (IRValue ^ "0"))
+                            << (Offset << Ti32 << (IRValue ^ "0"))))))
+            << (Instr
+                << (MemoryOp
+                    << (Load << envPtr << TPtr << envSlotPtr->clone())))
+            // Fun
+            << (Instr
+                << (MemoryOp
+                    << (GetElementPtr
+                        << funSlotPtr << closureTy->clone()
+                        << closurePtr->clone()
+                        << (OffsetList
+                            << (Offset << Ti32 << (IRValue ^ "0"))
+                            << (Offset << Ti32 << (IRValue ^ "1"))))))
+            << (Instr
+                << (MemoryOp
+                    << (Load << funPtr << TPtr << funSlotPtr->clone())))
+            // Argument
+            << (Compile << argIdent << _(Param))
+            // TODO: Insert function type here, so it is callable.
+            << (Action
+                << (CreateFunType << funTy << retLLVMType
+                                  << (IRTypeList << TPtr << argLLVMType)))
+            // Function call
+            << (Instr
+                << (MiscOp
+                    << (CallOpaque
+                        << _(Result) << funTy->clone() << funPtr->clone()
+                        << (ArgList << envPtr->clone() << argIdent->clone()))));
         },
 
         /**

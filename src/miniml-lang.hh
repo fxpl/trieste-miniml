@@ -108,6 +108,7 @@ namespace miniml {
   inline const auto Alloca = TokenDef("alloca");
   inline const auto Load = TokenDef("load");
   inline const auto Store = TokenDef("store");
+  inline const auto GetElementPtr = TokenDef("get_element_ptr");
 
   // TerminatorOps
   inline const auto TerminatorOp = TokenDef("terminator_op");
@@ -164,6 +165,8 @@ namespace miniml {
   inline const auto Dst = TokenDef("dst");
   inline const auto Result = TokenDef("result");
   inline const auto ArgList = TokenDef("argument_list");
+  inline const auto OffsetList = TokenDef("offset_list");
+  inline const auto Offset = TokenDef("offset");
 
   // Closure implementation
   inline const auto FreeVarList = TokenDef("free_var_list");

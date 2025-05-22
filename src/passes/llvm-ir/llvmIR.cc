@@ -210,6 +210,49 @@ namespace miniml {
               context->registers[resultId] = result;
               context->result = result;
 
+              std::cout << "MemoryOp - Load" << std::endl;
+
+              return _(Instr);
+            },
+
+            // GetElementPointer
+            T(Instr)[Instr]
+                << (T(MemoryOp)
+                    << (T(GetElementPtr)
+                        << (T(Ident)[Result] * T(Ident)[IRType] *
+                            T(Ident)[IRValue] * T(OffsetList)[OffsetList]))) >>
+              [context](Match& _) -> Node {
+              std::string valueId = node_val(_(IRValue));
+              Value* value = context->registers[valueId];
+              assert(value);
+
+              std::string typeId = node_val(_(IRType));
+              llvm::Type* type = context->types[typeId];
+              assert(type);
+
+              std::vector<Value*> offsets;
+              for (size_t i = 0; i < _(OffsetList)->size(); i++) {
+                Node offsetNode = _(OffsetList)->at(i);
+
+                std::string valStr = node_val(offsetNode / IRValue);
+                Node offsetType = offsetNode / IRType;
+                Value* offset = nullptr;
+                if (offsetType == Ti32) {
+                  int offsetValue = stoi(valStr);
+                  offset = context->builder.getInt32(offsetValue);
+                }
+                assert(offset);
+
+                offsets.push_back(offset);
+              }
+
+              std::string resultId = node_val(_(Result));
+              Value* result =
+                context->builder.CreateGEP(type, value, offsets, resultId);
+              context->registers[resultId] = result;
+
+              std::cout << "MemoryOp - GEP" << std::endl;
+
               return _(Instr);
             },
 

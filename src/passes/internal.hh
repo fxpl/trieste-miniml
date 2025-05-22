@@ -201,6 +201,11 @@ namespace miniml{
       
       inline const auto wf =
         wf_functions
+        // Remove symbol table references
+        | (FunDef <<= Ident * Type * Param * Expr * FreeVarList)
+        | (Param <<= Ident * Type)
+        | (Let <<= Ident * Type * Expr)
+        // WF
         | (Program <<= (Env | IRFun)++[1])
         | (Env <<= Type++)
         | (Body <<= (TopExpr | Expr)++)

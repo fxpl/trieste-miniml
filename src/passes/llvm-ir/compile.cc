@@ -143,7 +143,7 @@ namespace miniml {
           Node llvmType = getLLVMType(_(Type));
           assert(llvmType);
 
-          return Meta << (RegMap << _(Ident) << llvmType << value);
+          return Action << (CreateConst << _(Ident) << llvmType << value);
         },
 
         /**
@@ -157,7 +157,7 @@ namespace miniml {
           Node llvmType = getLLVMType(_(Type));
           assert(llvmType);
 
-          return Meta << (RegMap << _(Ident) << llvmType << value);
+          return Action << (CreateConst << _(Ident) << llvmType << value);
         },
 
         /**

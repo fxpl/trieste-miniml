@@ -36,12 +36,13 @@ namespace miniml {
     // Contains generated instructions and local and global value tables.
     llvm::Module llvm_module;
     // Named variables, for keeping track of function arguments.
-    std::map<std::string, Value*> namedVars;
+    std::map<std::string, llvm::Value*> namedVars;
     // Main function
     llvm::Function* currentFunction;
 
     // Maps register identifiers to their LLVM IR values.
-    std::map<std::string, Value*> registers;
+    std::map<std::string, llvm::Value*> registers;
+    std::map<std::string, llvm::Type*> types;
 
     // Maps temporary identifiers to actual function names.
     std::map<std::string, std::string> functions;
@@ -515,27 +516,29 @@ namespace miniml {
             },
 
             /**
-             * Meta operations since LLVM IR does not allow assigning a register
-             * to another
+             * Actions performed by LLVM IR builder.
              */
-            // Copy register value from Src to Dst.
-            T(Meta) << (T(RegCpy) << T(Ident)[Dst] * T(Ident)[Src]) >>
+            // Get Type
+            T(Action) << (T(GetType) << T(Ident)[Result] * T(Ident)[IRType]) >>
               [context](Match& _) -> Node {
-              std::string dst = node_val(_(Dst));
-              std::string src = node_val(_(Src));
-              Value* srcVal = context->registers[src];
-              assert(srcVal);
+              std::string valueId = node_val(_(IRType));
+              llvm::Value* value = context->registers[valueId];
+              assert(value);
 
-              context->registers[dst] = srcVal;
+              llvm::Type* destType = value->getType();
 
-              // Remove the meta node from the AST.
+              std::string resultId = node_val(_(Result));
+              context->types[resultId] = destType;
+
+              std::cout << "Action - GetType" << std::endl;
+
               return {};
             },
 
-            // Map the temporary id `Ident` to function `Fun`.
-            T(Meta) << (T(FuncMap) << T(Ident)[Ident] * T(Ident)[Fun]) >>
+            // Get Function
+            T(Action) << (T(GetFunction) << T(Ident)[Result] * T(Ident)[Fun]) >>
               [context](Match& _) -> Node {
-              std::string tmpIdent = node_val(_(Ident));
+              std::string tmpIdent = node_val(_(Result));
               std::string functionName = node_val(_(Fun));
               Function* theFunction =
                 context->llvm_module.getFunction(functionName);
@@ -543,21 +546,72 @@ namespace miniml {
 
               context->registers[tmpIdent] = theFunction;
 
-              // Remove the meta node from the AST.
+              // FIXME: Debug print.
+              std::cout << "Action - Storing fun: " << functionName
+                        << " as: " << tmpIdent << std::endl;
+
               return {};
             },
 
-            // Map the temporary `Ident` to Value* `IRValue`.
+            // Create Function Type
+            T(Action)
+                << (T(CreateFunType) << T(Ident)[Result] *
+                      T(Ti1, Ti32, Ti64, TPtr, TypeArrow)[IRType] *
+                      T(IRTypeList)[ParamList]) >>
+              [context](Match& _) -> Node {
+              Node returnType = _(IRType);
+              llvm::Type* returnLLVMType = NULL;
+              if (returnType == Ti32) {
+                returnLLVMType = context->builder.getInt32Ty();
+              } else if (returnType == Ti1) {
+                returnLLVMType = context->builder.getInt1Ty();
+              } else if (returnType == TypeArrow) {
+                // Returns a function
+                returnLLVMType = context->builder.getPtrTy();
+              }
+              assert(returnLLVMType);
 
-            T(Meta)
-                << (T(RegMap)
-                    << (T(Ident)[Ident] * T(Ti32, Ti1)[Type] *
+              std::vector<llvm::Type*> paramTypes;
+              for (size_t i = 0; i < _(ParamList)->size(); i++) {
+                Node paramTy = _(ParamList)->at(i);
+                llvm::Type* llvmType = nullptr;
+                if (paramTy == Ti32) {
+                  llvmType = context->builder.getInt32Ty();
+                } else if (paramTy == Ti1) {
+                  llvmType = context->builder.getInt1Ty();
+                } else if (paramTy == TPtr) {
+                  llvmType = context->builder.getPtrTy();
+                }
+                assert(llvmType);
+
+                paramTypes.push_back(llvmType);
+              }
+
+              FunctionType* theFunctionType = nullptr;
+              if (_(ParamList)->size() == 0) {
+                // Handle nullary functions
+                theFunctionType = FunctionType::get(returnLLVMType, false);
+              } else {
+                theFunctionType =
+                  FunctionType::get(returnLLVMType, paramTypes, false);
+              }
+              assert(theFunctionType);
+
+              std::string resultId = node_val(_(Result));
+              context->types[resultId] = theFunctionType;
+
+              std::cout << "Action - Creating funType at: " << resultId
+                        << std::endl;
+
+              return {};
+            },
+
+            // Create Constant
+            T(Action)
+                << (T(CreateConst)
+                    << (T(Ident)[Ident] * T(Ti64, Ti32, Ti1)[Type] *
                         T(IRValue)[IRValue])) >>
               [context](Match& _) -> Node {
-              // FIXME: debug print
-              std::cout << "Meta - Creating value at: " << node_val(_(Ident))
-                        << "\n";
-
               std::string regId = node_val(_(Ident));
               std::string valueStr = node_val(_(IRValue));
 
@@ -566,13 +620,18 @@ namespace miniml {
                 value = context->builder.getInt32(std::stoi(valueStr));
               } else if (_(Type) == Ti1) {
                 value = context->builder.getInt1(std::stoi(valueStr));
+              } else if (_(Type) == Ti64) {
+                value = context->builder.getInt64(std::stoi(valueStr));
               }
               assert(value);
 
               context->registers[regId] = value;
               context->result = value;
 
-              // Remove the meta node from the AST.
+              // FIXME: debug print
+              std::cout << "Action - Creating value: " << valueStr
+                        << " at: " << regId << "\n";
+
               return {};
             },
 

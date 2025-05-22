@@ -125,13 +125,13 @@ namespace miniml {
   inline const auto ConversionOp = TokenDef("conversion_op");
   inline const auto BitCast = TokenDef("bitcast");
 
-  // Meta operations (Not apart of LLVM IR)
-  inline const auto Meta = TokenDef("meta");
-  inline const auto RegCpy = TokenDef("reg_cpy");
-  inline const auto RegMap = TokenDef("reg_map");
-  inline const auto FuncMap = TokenDef("func_map");
-  inline const auto BlockMap = TokenDef("block_map");
-  inline const auto BlockCpy = TokenDef("block_cpy");
+  // LLVM Builder actions (not LLVM IR instructions)
+  inline const auto Action = TokenDef("action");
+  inline const auto CreateConst = TokenDef("create_const");
+  inline const auto CreateStructType = TokenDef("create_struct_type");
+  inline const auto CreateFunType = TokenDef("create_function_type");
+  inline const auto GetFunction = TokenDef("get_function");
+  inline const auto GetType = TokenDef("get_type");
 
   // LLVM IR Types
   inline const auto IRType = TokenDef("ir_type");

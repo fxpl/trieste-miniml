@@ -280,10 +280,9 @@ namespace miniml{
     | (MiscOp <<= (Call | Icmp | Phi))
       | (Call <<= (Result >>= Ident) * (Fun >>= Ident) * (Param >>= Ident))
       | (Icmp <<= (Result >>= Ident) * (Op >>= wf_comparison) * (Type >>= (Ti1 | Ti32)) * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
-      | (Phi <<= (Result >>= Ident) * (Type >>= wf_llvm_types) * Predecessor)
-        // TODO: Can probably organise better.
-        | (Predecessor <<= Prev++)
-          | (Prev <<= (IRValue >>= Ident) * (Label >>= Label))
+      | (Phi <<= (Result >>= Ident) * (Type >>= wf_llvm_types) * PredecessorList)
+        | (PredecessorList <<= Predecessor++)
+          | (Predecessor <<= (IRValue >>= Ident) * Label)
     | (TerminatorOp <<= (Branch | Jump | Ret))
       | (Branch <<= (Cond >>= Ident) * (True >>= Label) * (False >>= Label))
       | (Jump <<= (Label))

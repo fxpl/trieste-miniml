@@ -273,8 +273,8 @@ namespace miniml {
             T(Instr)[Instr]
                 << (T(MiscOp)
                     << (T(Phi) << T(Ident)[Ident] * T(Ti32, Ti1)[Type] *
-                          (T(Predecessor)
-                           << T(Prev)[True] * T(Prev)[False]))) >>
+                          (T(PredecessorList)
+                           << T(Predecessor)[True] * T(Predecessor)[False]))) >>
               [context](Match& _) -> Node {
               llvm::Type* type = NULL;
               if (_(Type) == Ti32) {
@@ -307,6 +307,8 @@ namespace miniml {
 
               context->registers[resultId] = phi;
               context->result = phi;
+
+              std::cout << "MiscOp - Phi" << std::endl;
 
               return _(Instr);
             },

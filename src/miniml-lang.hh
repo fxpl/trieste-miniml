@@ -156,8 +156,8 @@ namespace miniml {
   inline const auto SLE = TokenDef("sle");
 
   // Helpers
-  inline const auto Predecessor = TokenDef("predecessor");
-  inline const auto Prev = TokenDef("prev");
+  inline const auto PredecessorList = TokenDef("predecessor");
+  inline const auto Predecessor = TokenDef("prev");
   inline const auto Global = TokenDef("global");
   inline const auto IRValue = TokenDef("value", flag::print);
   inline const auto Src = TokenDef("src");

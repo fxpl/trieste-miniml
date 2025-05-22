@@ -329,9 +329,9 @@ namespace miniml {
                 << (MiscOp
                     << (Phi
                         << _(Ident) << llvmType
-                        << (Predecessor
-                            << (Prev << ifTrueId << thenEndLabel->clone())
-                            << (Prev << ifFalseId << elseEndLabel->clone())))));
+                        << (PredecessorList
+                            << (Predecessor << ifTrueId << thenEndLabel->clone())
+                            << (Predecessor << ifFalseId << elseEndLabel->clone())))));
           // clang-format on
         },
 

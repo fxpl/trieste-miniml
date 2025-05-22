@@ -448,27 +448,188 @@ namespace miniml {
           }
         },
 
-          return Seq
-            // TODO: Wait for closures to be done
-            // Create function body block.
-            // Remember block where function was declared.
-            // Tell code generator to create a function: its type, name, param.
-            << (Lift << Program
-                     << ((IRFun ^ funStr)
-                         << (FunDef << _(Ident) << funType
-                                    << (_(Param) / Ident))
-                         // Bind function to its internal name.
-                         << (Meta << (FuncMap << f << _(Ident)->clone()))
-                         // Set builder insertion point to function body.
-                         // << (Lift << Top << (Label << funBodyLabel->clone()))
-                         // TODO: Need to bind the block to the function.
-                         << (Compile << returnId << _(Expr))
-                         // MiniML has implicit return so must insert it here.
-                         << (Instr
-                             << (TerminatorOp << (Ret << returnId->clone())))));
-          // TODO: Pop current function.
-          //       (So any future blocks does not belong to this function)
-          // Reset IR builder insertion point.
+        /**
+         * Environment
+         */
+        T(Compile) << T(Env)[Env] >> [](Match& _) -> Node {
+          // FIXME: debug
+          std::cout << "Environment" << std::endl;
+
+          if (_(Env)->size() == 0) {
+            // Remove unnecessary environments
+            return {};
+          }
+
+          Node env = _(Env);
+          Node name = Ident ^ node_val(env);
+
+          std::cout << env->size() << std::endl;
+
+          for (size_t i = 0; i < env->size(); i++) {
+            Node type = _(Env)->at(i);
+            env->replace_at(i, (Compile << type));
+          }
+
+          auto typesToCompile = *_(Env);
+
+          return Action
+            << (CreateStructType << name << (IRTypeList << typesToCompile));
+        },
+
+        /**
+         * Closure
+         */
+        T(Compile)
+            << (T(Ident)[Result] *
+                (T(Expr)
+                 << (T(Type) *
+                     (T(Closure)[Closure]
+                      << (T(Ident)[Fun] * T(Env)[Env] *
+                          (T(FreeVarList)[FreeVarList])))))) >>
+          [](Match& _) -> Node {
+          // FIXME: debug print
+          std::cout << "compiling closure" << std::endl;
+
+          Node funToCall = Ident ^ "malloc";
+
+          // FIXME: Assumes a ptr is i64 = 8 Bytes.
+          size_t closureByteCount = 20;
+          Node closureBytesValue = IRValue ^ std::to_string(closureByteCount);
+          Node closureBytes = Ident ^ _(Closure)->fresh();
+          // Node closurePtr = Ident ^ _(Closure)->fresh();
+          Node closurePtr = _(Result);
+          Node closureTy = Ident ^ "ClosureTy";
+
+          std::string uniqueId = std::string(_(Closure)->fresh().view());
+
+          Node envSlotPtr = Ident ^ "envSlot_" + uniqueId;
+          Node envPtr = Ident ^ "envPtr_" + uniqueId;
+
+          Node funSlotPtr = Ident ^ "funSlot_" + uniqueId;
+          Node funPtr = Ident ^ "funPtr_" + uniqueId;
+
+          // TODO: Handle free var and none freevar separately
+          if (_(FreeVarList)->size() == 0) {
+            // CLOSURE WITHOUT ENVIRONMENT.
+            return Seq
+              // TODO: Malloc Closure.
+              << (Action
+                  << (CreateConst << closureBytes << Ti64 << closureBytesValue))
+              << (Instr
+                  << (MiscOp
+                      << (Call << closurePtr << funToCall->clone()
+                               << (ArgList << closureBytes->clone()))))
+
+              // GEP function slot in closure.
+              << (Instr
+                  << (MemoryOp
+                      << (GetElementPtr
+                          << funSlotPtr << closureTy->clone()
+                          << closurePtr->clone()
+                          << (OffsetList
+                              << (Offset << Ti32 << (IRValue ^ "0"))
+                              << (Offset << Ti32 << (IRValue ^ "1"))))))
+
+              // Store function ptr in closure.
+              << (Action << (GetFunction << funPtr << _(Fun)))
+              << (Instr
+                  << (MemoryOp
+                      << (Store << funPtr->clone() << funSlotPtr->clone())));
+          } else {
+            // CLOSURE WITH ENVIRONMENT.
+
+            // FIXME: dynamic calc of malloc size
+            // FIXME: Assumes single integer
+            // FIXME: Not sure how to do it otherwise
+            for (size_t i = 0; i < _(FreeVarList)->size(); i++) {
+              // DO nothing
+            }
+            size_t envByteCount = 4;
+
+            Node envBytesValue = IRValue ^ std::to_string(envByteCount);
+            Node envBytes = Ident ^ _(Closure)->fresh();
+            Node envTy = Ident ^ node_val(_(Env));
+
+            return Seq
+              // TODO: Malloc environment
+              << (Action << (CreateConst << envBytes << Ti64 << envBytesValue))
+              << (Instr
+                  << (MiscOp
+                      << (Call << envPtr << funToCall
+                               << (ArgList << envBytes->clone()))))
+
+              // TODO: ForEach FreeVar, do:
+              // TODO: Load freeVar.
+              // TODO: GEP freeVar slot in envPtr
+              // TODO: Store freeVar.
+              // TODO: This has to be done in a separate compile node :/
+              // << (Compile << (Load and Store FreeVars to environment ptr))
+              // _(Env) = ident for struct type
+              << (Compile << envTy->clone() << envPtr->clone() << FreeVarList)
+
+              // TODO: Malloc Closure.
+              << (Action
+                  << (CreateConst << closureBytes << Ti64 << closureBytesValue))
+              << (Instr
+                  << (MiscOp
+                      << (Call << closurePtr << funToCall->clone()
+                               << (ArgList << closureBytes->clone()))))
+              // GEP env slot in closure.
+              << (Instr
+                  << (MemoryOp
+                      << (GetElementPtr
+                          << envSlotPtr << closureTy << closurePtr->clone()
+                          << (OffsetList
+                              << (Offset << Ti32 << (IRValue ^ "0"))
+                              << (Offset << Ti32 << (IRValue ^ "0"))))))
+
+              // Store envptr in closure.
+              << (Instr
+                  << (MemoryOp
+                      << (Store << envPtr->clone() << envSlotPtr->clone())))
+
+              // GEP function slot in closure.
+              << (Instr
+                  << (MemoryOp
+                      << (GetElementPtr
+                          << funSlotPtr << closureTy->clone()
+                          << closurePtr->clone()
+                          << (OffsetList
+                              << (Offset << Ti32 << (IRValue ^ "0"))
+                              << (Offset << Ti32 << (IRValue ^ "1"))))))
+
+              // Store function ptr in closure.
+              << (Action << (GetFunction << funPtr << _(Fun)))
+              << (Instr
+                  << (MemoryOp
+                      << (Store << funPtr->clone() << funSlotPtr->clone())));
+          }
+        },
+
+        /**
+         * Type
+         */
+        T(Compile) << T(Type)[Type] >> [](Match& _) -> Node {
+          Node llvmType = getLLVMType(_(Type));
+          if (llvmType == nullptr) {
+            return err(_(Type), "Cannot convert to equivalent LLVM IR type");
+          }
+
+          return llvmType;
+        },
+
+        /**
+         * ParamList
+         */
+        T(Compile) << T(ParamList)[ParamList] >> [](Match& _) -> Node {
+          Node parent = _(ParamList);
+
+          for (size_t i = 0; i < parent->size(); i++) {
+            Node child = parent->at(i);
+            parent->replace_at(i, (Compile << child));
+          }
+
+          return parent;
         },
 
         /**
@@ -480,6 +641,59 @@ namespace miniml {
           assert(llvmType);
 
           return Param << _(Ident) << llvmType;
+        },
+
+        /**
+         * FreeVarList
+         */
+        T(Compile) << T(Ident)[Env] * T(Ident)[TPtr] *
+              T(FreeVarList)[FreeVarList] >>
+          [](Match& _) -> Node {
+          // FIXME: debug print
+          std::cout << "compiling freevarlist" << std::endl;
+          Node envPtr = _(TPtr);
+          Node envTy = _(Env);
+
+          Node seq = Seq;
+          for (size_t i = 0; i < _(FreeVarList)->size(); i++) {
+            Node freeVar = _(FreeVarList)->at(i);
+            Node ident = freeVar / Ident;
+            Node type = freeVar / Type;
+
+            Node tmp = Ident ^ _(FreeVarList)->fresh();
+            Node freeVarSlot = Ident ^ _(FreeVarList)->fresh();
+
+            // Load FV from enclosing scope
+            seq << (Instr << (MemoryOp << (Load << tmp << type << ident)));
+            // GEP FV slot in environment (need env_type, env_ptr and i)
+            seq
+              << (Instr
+                  << (MemoryOp
+                      << (GetElementPtr
+                          << freeVarSlot << envTy->clone() << envPtr->clone()
+                          << (OffsetList
+                              << (Offset << Ti32 << (IRValue ^ "0"))
+                              << (Offset << Ti32
+                                         << (IRValue ^ std::to_string(i)))))));
+            // Store FV in env
+            seq
+              << (Instr << (MemoryOp << (Store << tmp << type << freeVarSlot)));
+          }
+
+          return seq;
+        },
+
+        // Propagate Compile onto several nodes.
+        T(Compile) << T(TODO)[TODO] >> [](Match& _) -> Node {
+          for (size_t i = 0; i < _(TODO)->size(); i++) {
+            Node child = _(TODO)->at(i);
+            Node ident = Ident ^ _(TODO)->fresh();
+            _(TODO)->replace_at(i, Compile << ident << child);
+          }
+
+          auto children = *_(TODO);
+
+          return Seq << children;
         },
       }};
   }

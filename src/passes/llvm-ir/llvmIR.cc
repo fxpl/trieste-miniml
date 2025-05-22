@@ -733,7 +733,13 @@ namespace miniml {
       genPrintInt(context);
       genPrintBool(context);
 
+      // Declare a closure type
+      StructType* ClosureTy =
+        StructType::create(context->llvm_context, "ClosureTy");
+      ClosureTy->setBody(
+        {context->builder.getPtrTy(), context->builder.getPtrTy()}, false);
 
+      context->types["ClosureTy"] = ClosureTy;
 
       return 0;
     });
@@ -792,6 +798,11 @@ namespace miniml {
       {context->builder.getInt8Ty()->getPointerTo()},
       true);
     context->llvm_module.getOrInsertFunction("printf", printfFunctionType);
+
+    // malloc(i64) -> ptr
+    FunctionType* mallocFunctionType = FunctionType::get(
+      context->builder.getPtrTy(), {context->builder.getInt64Ty()}, false);
+    context->llvm_module.getOrInsertFunction("malloc", mallocFunctionType);
   }
 
   /**

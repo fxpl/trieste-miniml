@@ -50,23 +50,18 @@ namespace miniml {
           // FIXME: Debug print
           std::cout << "Compile" << std::endl;
 
-          auto prog = _(Program);
+          Node prog = _(Program);
 
           // Generate identifiers for each of the program's top expressions.
-          for (size_t i = 0; i < prog->size() - 1; i++) {
-            Node ident = Ident ^ prog->fresh();
+          for (size_t i = 0; i < prog->size(); i++) {
             Node topexpr = prog->at(i);
-
-            prog->replace_at(i, Compile << ident << topexpr);
+            if (topexpr == TopExpr || topexpr == Expr) {
+              Node ident = Ident ^ prog->fresh();
+              prog->replace_at(i, Compile << ident << topexpr);
+            } else {
+              prog->replace_at(i, Compile << topexpr);
+            }
           }
-
-          // The last topexpression is bound to the identifier of the program.
-          Node topexpr = prog->at(prog->size() - 1);
-          prog->replace_at(prog->size() - 1, (Compile << _(Ident) << topexpr));
-
-          // Create main function and move all the instructions into it.
-          Node mainFun = IRFun ^ "main";
-          Node entryPoint = Label ^ "entry";
 
           auto topExpressions = *_(Program);
           prog->erase(prog->begin(), prog->end());
@@ -81,8 +76,7 @@ namespace miniml {
           //
           // Where Ident holds the identifier of the program return value.
 
-          return Seq << _(Ident)->clone()
-                     << (prog << (mainFun << entryPoint << topExpressions));
+          return Seq << _(Ident)->clone() << (prog << topExpressions);
         },
 
         /**
@@ -374,18 +368,21 @@ namespace miniml {
             return err(_(TypeArrow), "print function with this type not found");
           }
 
-          return (Meta << (FuncMap << _(Ident) << funcName));
+          return (Action << (GetFunction << _(Ident) << funcName));
         },
 
         /**
-         * Fun
+         * Function Declaration
          */
-        T(Compile) << T(Ident)[Ident] *
-              (T(Expr) << T(Type) *
-                 (T(Fun)
-                  << (T(FunDef) << T(Ident)[Fun] * T(Type)[Type] *
-                        T(Param)[Param] * T(Expr)[Expr]))) >>
+        T(Compile)
+            << (T(IRFun)[IRFun]
+                << (T(Ident)[Ident] * T(Type)[Type] * T(ParamList)[ParamList] *
+                    T(Env)[Env] * (T(Body)[Body] << (Any++)[Expr]))) >>
           [](Match& _) -> Node {
+          // FIXME debug print
+          std::cout << "compiling function: " << node_val(_(IRFun))
+                    << std::endl;
+
           // When compiling a function we need to
           // - create function type
           // TODO: How to deal with t_var? LLVM IR is strongly typed..
@@ -403,33 +400,53 @@ namespace miniml {
           Node funType = TypeArrow << paramType << returnType;
 
           // TODO: Deal with function naming. example:
-          // let id = fun f x is x;;
-          // Both ´id´(Ident) and ´f´(Fun) point to same function.
+          // Both ´node_val(IRfun)' and ´f´(Fun) point to same function.
           // But f is only inside the scope of the function.
-          // Can we use Trieste symboltable maybe?
-          Node f = _(Fun);
-
-          std::string funStr = node_val(_(Ident));
-
-          Node funBodyLabel = Label ^ ("funBody_" + funStr);
-
-          Node returnId = Ident ^ ("retVal_" + funStr);
+          std::string uniqueId = std::string(_(IRFun)->fresh().view());
+          Node entryPoint = Label ^ ("entry_" + uniqueId);
+          Node returnId = Ident ^ ("ret_" + uniqueId);
 
           // -- need to bind the arguments of the function
           // -- here, any free variables?!
-
-          // TODO: This should create a closure where it is,
-          // allocating closure, populating it with function name and
-          // values of any free variables.
-          //
           // FIXME: How to map free variables in fun to loads of closure?
           // Then a fun token should be lifted, containing the function body,
           // name and type. The lifted fun token is used by CodeGen pass to
           // declare function
 
-          // TODO: Long term plan:
-          // Create closure
-          // Lift function with reference to closure
+          if ("main" == node_val(_(IRFun))) {
+            return Seq
+              << ((IRFun ^ node_val(_(IRFun)))
+                  << funType << (Compile << _(ParamList))
+                  << (Body
+                      << entryPoint
+                      // TODO: Instructions for loading from environment here
+                      // FIXME: We need the free variable list to create
+                      // those instructions :/
+                      // FIXME: Main can contain multiple expressions!
+                      << (Compile << (TODO << _[Expr]))
+                      // main() expected to return 0 for program success.
+                      << (Action
+                          << (CreateConst << returnId->clone() << Ti32
+                                          << (IRValue ^ "0")))
+                      << (Instr
+                          << (TerminatorOp << (Ret << returnId->clone())))));
+          } else {
+            return Seq
+              << ((IRFun ^ node_val(_(IRFun)))
+                  << funType << (Compile << _(ParamList))
+                  << (Body
+                      << entryPoint
+                      // TODO: Instructions for loading from environment here
+                      // FIXME: We need the free variable list to create
+                      // those instructions :/
+
+                      // Lambdas can only contain a single expression.
+                      << (Compile << returnId << _(Expr))
+                      // MiniML has implicit return so must insert it here.
+                      << (Instr
+                          << (TerminatorOp << (Ret << returnId->clone())))));
+          }
+        },
 
           return Seq
             // TODO: Wait for closures to be done

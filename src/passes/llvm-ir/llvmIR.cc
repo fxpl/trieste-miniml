@@ -315,11 +315,13 @@ namespace miniml {
 
             // Label
             In(Block) * T(Label)[Label] >> [context](Match& _) -> Node {
-              // FIXME: Debug print
-              std::cout << "Label - Setting cursor at: " << node_val(_(Label))
-                        << std::endl;
-
+              std::string funId = node_val(_(Label)->parent(IRFun));
               std::string blockId = node_val(_(Label));
+
+              // FIXME: Debug print
+              std::cout << "Label - Setting cursor at: " << blockId << " in "
+                        << funId << std::endl;
+
               llvm::BasicBlock* block = context->basicBlocks[blockId];
               assert(block);
 
@@ -445,76 +447,66 @@ namespace miniml {
             /**
              * Function Declaration
              */
-            T(FunDef)[FunDef]
-                << (T(Ident)[Ident] * T(TypeArrow)[TypeArrow] *
-                    T(Ident)[Param]) >>
+            T(IRFun)[Fun] << T(TypeArrow)[TypeArrow] * T(ParamList)[ParamList] *
+                  T(Body) >>
               [context](Match& _) -> Node {
+              // FIXME: debug print
+              std::cout << "Fun - declaring fun: " << node_val(_(Fun))
+                        << std::endl;
+
               // Create function type.
               // TODO: Convert trieste::token to llvm::type* in helper function.
-              // TODO: Support TVar.
-              Node paramType = _(TypeArrow) / Ty1;
-              llvm::Type* paramLLVMType = NULL;
-              if (paramType == Ti32) {
-                paramLLVMType = context->builder.getInt32Ty();
-              } else if (paramType == Ti1) {
-                paramLLVMType = context->builder.getInt1Ty();
-              } else {
-                return err(_(Type), "Not a valid type for function parameter");
-              }
-              assert(paramLLVMType);
 
+              // TODO: Fix return type (maybe this should be only returntype?)
               Node returnType = _(TypeArrow) / Ty2;
               llvm::Type* returnLLVMType = NULL;
               if (returnType == Ti32) {
                 returnLLVMType = context->builder.getInt32Ty();
               } else if (returnType == Ti1) {
                 returnLLVMType = context->builder.getInt1Ty();
-              } else {
-                return err(_(Type), "Not a valid type for function return");
+              } else if (returnType == TypeArrow) {
+                // Returns a function
+                returnLLVMType = context->builder.getPtrTy();
               }
               assert(returnLLVMType);
 
-              // FIXME: All functions assumed to have a single parameter.
-              // TODO: support nullary functions.
-              // TODO: support higher order functions.
-              // TODO: Should be possible to shadow functions
-              // TODO: if TVar: Need to determine which function to use
-              FunctionType* theFunctionType =
-                FunctionType::get(returnLLVMType, {paramLLVMType}, false);
+              std::vector<llvm::Type*> paramTypes;
+              for (size_t i = 0; i < _(ParamList)->size(); i++) {
+                Node param = _(ParamList)->at(i);
+                Node type = param / Type;
+                llvm::Type* llvmType = nullptr;
+                if (type == Ti32) {
+                  llvmType = context->builder.getInt32Ty();
+                } else if (type == Ti1) {
+                  llvmType = context->builder.getInt1Ty();
+                } else if (type == TPtr) {
+                  llvmType = context->builder.getPtrTy();
+                }
+                assert(llvmType);
 
-              // Create function prototype
-              std::string theFunctionName = node_val(_(Ident));
+                paramTypes.push_back(llvmType);
+              }
+
+              FunctionType* theFunctionType = nullptr;
+              if (_(ParamList)->size() == 0) {
+                // Handle nullary functions
+                theFunctionType = FunctionType::get(returnLLVMType, false);
+              } else {
+                theFunctionType =
+                  FunctionType::get(returnLLVMType, paramTypes, false);
+              }
+              assert(theFunctionType);
+
+              std::string theFunctionName = node_val(_(Fun));
               Function* theFunction = Function::Create(
                 theFunctionType,
-                // FIXME: Anytime non-external linkage is used?
                 Function::LinkageTypes::ExternalLinkage,
                 theFunctionName,
                 context->llvm_module);
               theFunction->setCallingConv(CallingConv::C);
               context->registers[theFunctionName] = theFunction;
 
-              // Name parameter(s)
-              // FIXME: Need to bind param name within function to argument.
-              std::string paramName = node_val(_(Param));
-              Argument* arg = theFunction->arg_begin();
-              arg->setName(paramName);
-              // FIXME: this is a workaround to bind paramName to argument.
-              // FIXME: I just assume param names never shadow existing
-              // variables.
-              context->registers[paramName] = arg;
-
-              // Create function body block
-              // FIXME: Assumes next instruction is the function body.
-              BasicBlock* printBoolBody = BasicBlock::Create(
-                context->llvm_context, theFunctionName + "_entry", theFunction);
-              context->builder.SetInsertPoint(printBoolBody);
-
-              // Map function name to temporary identifier.
-              context->functions[theFunctionName] = theFunctionName;
-
-              context->currentFunction = theFunction;
-
-              return _(FunDef);
+              return _(Fun);
             },
 
             /**
@@ -638,15 +630,15 @@ namespace miniml {
             },
 
             // Create Basic Block
-            In(IRFun) * T(Block)[Block] >> [context](Match& _) -> Node {
-              // FIXME: debug print
-              std::cout << "Block - Creating block: " << node_val(_(Block))
-                        << "\n";
-
-              std::string funName = node_val(_(Block)->parent());
+            In(Body) * T(Block)[Block] >> [context](Match& _) -> Node {
+              std::string funName = node_val(_(Block)->parent(IRFun));
               Function* function = context->llvm_module.getFunction(funName);
               assert(function);
               context->currentFunction = function;
+
+              // FIXME: debug print
+              std::cout << "Block - Creating block: " << node_val(_(Block))
+                        << " in: " << funName << "\n";
 
               std::string blockId = node_val(_(Block));
               BasicBlock* block = BasicBlock::Create(
@@ -657,15 +649,6 @@ namespace miniml {
               return _(Block);
             },
 
-            // Assign temporary identifier to current Basic Block.
-            T(Meta) << (T(BlockCpy) << T(Label)[Label]) >>
-              [context](Match& _) -> Node {
-              context->basicBlocks[node_val(_(Label))] =
-                context->builder.GetInsertBlock();
-
-              // Remove the meta node from the AST.
-              return {};
-            },
           }};
 
     pass.pre([context](Node) {
@@ -680,18 +663,10 @@ namespace miniml {
       genPrintInt(context);
       genPrintBool(context);
 
-      // Main(void) -> i32
-      FunctionType* mainFuncType =
-        FunctionType::get(Type::getInt32Ty(context->llvm_context), false);
 
-      context->currentFunction = Function::Create(
-        mainFuncType,
-        Function::LinkageTypes::ExternalLinkage,
-        "main",
-        context->llvm_module);
 
-      // BasicBlock* entry = BasicBlock::Create(
-      //   context->llvm_context, "entry", context->currentFunction);
+      return 0;
+    });
 
       // context->builder.SetInsertPoint(entry);
 
@@ -700,25 +675,25 @@ namespace miniml {
 
     pass.post([context](Node) {
       // TODO: How to make sure this return is inserted at the end of main?
-      Value* result = context->result;
-      assert(result);
+      // Value* result = context->result;
+      // assert(result);
 
-      llvm::Type* resultType = result->getType();
+      // llvm::Type* resultType = result->getType();
 
-      Function* printFun = NULL;
-      if (resultType == context->builder.getInt1Ty()) {
-        printFun = context->llvm_module.getFunction("native$printBool");
-      } else if (resultType == context->builder.getInt32Ty()) {
-        printFun = context->llvm_module.getFunction("native$printInt");
-      } else {
-        // TODO: Error! Printtype not implemented!
-      }
-      assert(printFun);
+      // Function* printFun = NULL;
+      // if (resultType == context->builder.getInt1Ty()) {
+      //   printFun = context->llvm_module.getFunction("native$printBool");
+      // } else if (resultType == context->builder.getInt32Ty()) {
+      //   printFun = context->llvm_module.getFunction("native$printInt");
+      // } else {
+      //   // TODO: Error! Printtype not implemented!
+      // }
+      // assert(printFun);
 
-      context->builder.CreateCall(printFun, {context->result});
+      // context->builder.CreateCall(printFun, {context->result});
 
-      // Return 0 to indicate success.
-      context->builder.CreateRet(context->builder.getInt32(0));
+      // // Return 0 to indicate success.
+      // context->builder.CreateRet(context->builder.getInt32(0));
 
       Function* main = context->llvm_module.getFunction("main");
       verifyFunction(*main, &llvm::errs());

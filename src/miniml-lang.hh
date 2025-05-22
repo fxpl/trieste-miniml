@@ -119,6 +119,7 @@ namespace miniml {
   // MiscOps
   inline const auto MiscOp = TokenDef("misc_op");
   inline const auto Call = TokenDef("call");
+  inline const auto CallOpaque = TokenDef("call_opaque");
   inline const auto Icmp = TokenDef("icmp");
   inline const auto Phi = TokenDef("phi");
 

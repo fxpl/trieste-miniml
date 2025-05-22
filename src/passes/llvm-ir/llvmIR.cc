@@ -14,7 +14,7 @@
 #pragma clang diagnostic ignored "-Wunused-parameter"
 #pragma clang diagnostic ignored "-Wshadow"
 #include "llvm/Support/raw_ostream.h"
-
+#include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
@@ -260,33 +260,74 @@ namespace miniml {
              * Misc. Operations
              */
             // Function Call
-            T(Instr)
+            T(Instr)[Instr]
                 << (T(MiscOp)
                     << (T(Call) << T(Ident)[Result] * T(Ident)[Fun] *
-                          T(Ident)[Param])) >>
+                          T(ArgList)[ArgList])) >>
               [context](Match& _) -> Node {
-              std::string paramId = node_val(_(Param));
-              Value* param = context->registers[paramId];
-              assert(param);
+              std::string funId = node_val(_(Fun));
+              Function* function = context->llvm_module.getFunction(funId);
 
-              // TODO: Due to implementation the function identifier could be a
-              // register, function name or parameter.
-              std::string tmpFuncId = node_val(_(Fun));
-              // FIXME: temporarily only look for function in registers
-              // std::string funcName = context->functions[tmpFuncId];
-              // assert(!funcName.empty());
+              if (function == nullptr) {
+                function = (Function*)context->registers[funId];
+              }
+              assert(function);
 
-              // Function* function =
-              // context->llvm_module.getFunction(funcName); assert(function);
+              std::vector<llvm::Value*> arguments;
+              for (size_t i = 0; i < _(ArgList)->size(); i++) {
+                Node arg = _(ArgList)->at(i);
+                std::string argId = node_val(arg);
+                Value* argVal = context->registers[argId];
+                assert(argVal);
 
-              Function* function = (Function*)context->registers[tmpFuncId];
+                arguments.push_back(argVal);
+              }
 
               std::string resultId = node_val(_(Result));
               Value* result =
-                context->builder.CreateCall(function, {param}, resultId);
+                context->builder.CreateCall(function, arguments, resultId);
 
               context->registers[resultId] = result;
               context->result = result;
+
+              std::cout << "MiscOp - Call " << funId << std::endl;
+
+              return _(Instr);
+            },
+
+            // Function Call (Opaque)
+            T(Instr)[Instr]
+                << (T(MiscOp)
+                    << (T(CallOpaque) << T(Ident)[Result] * T(Ident)[IRType] *
+                          T(Ident)[Fun] * T(ArgList)[ArgList])) >>
+              [context](Match& _) -> Node {
+              std::string funTyId = node_val(_(IRType));
+              llvm::FunctionType* funTy =
+                (llvm::FunctionType*)context->types[funTyId];
+              assert(funTy);
+
+              std::string funId = node_val(_(Fun));
+              llvm::Value* functionPtr = context->registers[funId];
+              assert(functionPtr);
+
+              std::vector<llvm::Value*> arguments;
+              for (size_t i = 0; i < _(ArgList)->size(); i++) {
+                Node arg = _(ArgList)->at(i);
+                std::string argId = node_val(arg);
+                Value* argVal = context->registers[argId];
+                assert(argVal);
+
+                arguments.push_back(argVal);
+              }
+
+              std::string resultId = node_val(_(Result));
+              Value* result = context->builder.CreateCall(
+                funTy, functionPtr, arguments, resultId);
+
+              context->registers[resultId] = result;
+              context->result = result;
+
+              std::cout << "MiscOp - Call (Opaque)" << funId << std::endl;
 
               return _(Instr);
             },

@@ -10,6 +10,8 @@ namespace miniml {
             return Ti1;
         } else if (type == TypeArrow) {
             // TODO: Not sure how to handle this yet, so just return it
+            return TPtr;
+        } else if (type == TPtr) {
             return type;
         } else {
             // Not supported type

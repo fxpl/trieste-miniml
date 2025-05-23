@@ -671,9 +671,10 @@ namespace miniml {
          * Type
          */
         T(Compile) << T(Type)[Type] >> [](Match& _) -> Node {
-          Node llvmType = getLLVMType(_(Type));
+          Node llvmType = getLLVMType(_(Type) / Type);
           if (llvmType == nullptr) {
-            return err(_(Type), "Cannot convert to equivalent LLVM IR type");
+            return err(
+              _(Type) / Type, "Cannot convert to equivalent LLVM IR type");
           }
 
           return llvmType;

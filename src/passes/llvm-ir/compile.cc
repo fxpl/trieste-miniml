@@ -491,7 +491,7 @@ namespace miniml {
                                    << (Ret << returnId->clone())))));
           } else {
             Node envTy = Ident ^ node_val(_(Env));
-            Node envPtr = (_(ParamList)->front() / Ident)->clone();
+            Node envPtr = (_(ParamList)->at(1) / Ident)->clone();
 
             return Seq
               << ((IRFun ^ node_val(_(IRFun)))

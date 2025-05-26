@@ -10,6 +10,8 @@ namespace miniml {
   struct Context {
     // <FunDef> -> <Ident>++
     std::map<Node, std::set<Node>> freeVars;
+    // To avoid duplicate free variables.
+    std::map<Node, std::set<std::string>> freeVarNames;
   };
 
   /**
@@ -19,7 +21,7 @@ namespace miniml {
    * This pass must be bottom up to ensure Top is the last visited node.
    */
   PassDef free_variables() {
-    auto context = std::make_shared<Context>();
+    auto ctx = std::make_shared<Context>();
 
     return {
       "free_variables",
@@ -27,25 +29,23 @@ namespace miniml {
       (dir::bottomup | dir::once),
       {
         // Find free variables and their function definition.
-        In(Expr) * T(Ident)[Ident] >> [context](Match& _) -> Node {
-          Node ancestor = _(Ident)->parent(FunDef);
-          if (ancestor != nullptr) {
-            // Ensures FunDef nodes without free variables are in the map.
-            if (!context->freeVars.contains(ancestor)) {
-              context->freeVars[ancestor];
-            }
+        In(Expr) * T(Ident)[Ident] >> [ctx](Match& _) -> Node {
+          Node ident = _(Ident);
+          std::string name = node_val(ident);
+          Node enclosingScope = ident->parent(FunDef);
 
-            // TODO: _(Token)->scope() // Returns enclosing node with symbol
-            // table
-            auto defs = _(Ident)->lookup();
+          if (enclosingScope != nullptr) {
+            auto defs = ident->lookup();
             if (!defs.empty()) {
               auto def = defs.front();
+              Node defScope = def->parent(Fun)->front();
 
-              if (def->type() == Let) {
-                context->freeVars[ancestor].insert(_(Ident));
-              } else if (
-                def->type() == Param && def->parent(Fun)->front() != ancestor) {
-                context->freeVars[ancestor].insert(_(Ident));
+              if (
+                (def->type() == Let ||
+                 (def->type() == Param && defScope != enclosingScope)) &&
+                (!ctx->freeVarNames[enclosingScope].contains(name))) {
+                ctx->freeVarNames[enclosingScope].insert(name);
+                ctx->freeVars[enclosingScope].insert(ident);
               }
             }
           }
@@ -53,26 +53,30 @@ namespace miniml {
         },
 
         // Ensure all FunDefs are appended with a FreeVarList
-        T(FunDef)[FunDef] >> [context](Match& _) -> Node {
+        T(FunDef)[FunDef] >> [ctx](Match& _) -> Node {
           Node funDef = _(FunDef);
-          if (!context->freeVars.contains(funDef)) {
-            context->freeVars[funDef];
+          if (!ctx->freeVars.contains(funDef)) {
+            ctx->freeVars[funDef];
           }
 
           return _(FunDef);
         },
 
         // Add a list of free variables to the function definition.
-        T(Program)[Program] >> [context](Match& _) -> Node {
-          for (auto pair : context->freeVars) {
+        T(Program)[Program] >> [ctx](Match& _) -> Node {
+          for (auto pair : ctx->freeVars) {
             Node funDef = pair.first;
 
             Node freeVarList = FreeVarList;
             for (auto ident : pair.second) {
               Node expr = ident->parent();
+              Node exprId = expr->back();
+              Node exprTy = expr->front();
+
               Node freeVar = FreeVar;
-              freeVar->push_back(expr->back()->clone()); // Ident.
-              freeVar->push_back(expr->front()->clone()); // Type.
+              freeVar->push_back(exprId->clone());
+              freeVar->push_back(exprTy->clone());
+
               freeVarList->push_back(freeVar);
             }
 

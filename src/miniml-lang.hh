@@ -98,7 +98,7 @@ namespace miniml {
   inline const auto Instr = TokenDef("instr");
   inline const auto Label = TokenDef("label", flag::print);
   inline const auto Block = TokenDef("basic_block", flag::print);
-  inline const auto IRFun = TokenDef("ir_function", flag::print);
+  inline const auto IRFun = TokenDef("ir_function", flag::print | flag::symtab);
 
   // BinaryOps
   inline const auto BinaryOp = TokenDef("binary_op");
@@ -160,7 +160,7 @@ namespace miniml {
   // Helpers
   inline const auto PredecessorList = TokenDef("predecessor");
   inline const auto Predecessor = TokenDef("prev");
-  inline const auto Global = TokenDef("global");
+  inline const auto Global = TokenDef("global", flag::print);
   inline const auto IRValue = TokenDef("value", flag::print);
   inline const auto Src = TokenDef("src");
   inline const auto Dst = TokenDef("dst");
@@ -180,4 +180,5 @@ namespace miniml {
   inline const auto FunCall = TokenDef("fun_call");
   inline const auto Body = TokenDef("body");
   inline const auto IRTypeList = TokenDef("ir_type_list");
+  inline const auto IRProgram = TokenDef("ir_program");
 }

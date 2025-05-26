@@ -40,9 +40,9 @@ namespace miniml {
 
           Node lambda = IRFun ^ "lambda_" + uniqueId;
 
-          return Seq << (Lift << Program << env)
+          return Seq << (Lift << IRProgram << env)
                      << (Lift
-                         << Program
+                         << IRProgram
                          << (lambda << _(Ident) << _(Type)
                                     << (ParamList << (Param << (Ident ^ "env")
                                                             << (Type << TPtr))

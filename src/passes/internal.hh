@@ -326,7 +326,7 @@ namespace miniml{
   inline const auto wf_operand = (Int | Ident);
 
   inline const auto wf =
-    LLVMIRBlockify::wf - Action
+    LLVMIRBlockify::wf
     ;
       
     }

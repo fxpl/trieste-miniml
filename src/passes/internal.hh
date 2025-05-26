@@ -193,7 +193,7 @@ namespace miniml{
       inline const auto wf_functions =
         wf_freeVars
         | (Program <<= IRFun++)
-        | (IRFun <<= Ident * Type * ParamList * Env * Body)
+        | (IRFun <<= Ident * Type * ParamList * Env * Body * FreeVarList)
         | (ParamList <<= Param++)
         | (Body <<= TopExpr++)
         ;

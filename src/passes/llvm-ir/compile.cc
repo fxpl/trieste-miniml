@@ -357,8 +357,6 @@ namespace miniml {
               (T(Expr) << (T(Type)) *
                  (T(ClosureCall) << (T(Expr)[Fun]) * T(Expr)[Param])) >>
           [](Match& _) -> Node {
-          // FIXME: This treats all functions as if they are closures,
-          // not sure how to deal with print.
           Node argIdent = Ident ^ _(Param)->fresh();
           Node funIdent = Ident ^ _(Param)->fresh();
 
@@ -408,7 +406,7 @@ namespace miniml {
                     << (Load << funPtr << TPtr << funSlotPtr->clone())))
             // Argument
             << (Compile << argIdent << _(Param))
-            // TODO: Insert function type here, so it is callable.
+            // Fun type
             << (Action
                 << (CreateFunType << funTy << retLLVMType
                                   << (IRTypeList << TPtr << argLLVMType)))
@@ -451,7 +449,8 @@ namespace miniml {
         T(Compile)
             << (T(IRFun)[IRFun]
                 << (T(Ident)[Ident] * T(Type)[Type] * T(ParamList)[ParamList] *
-                    T(Env)[Env] * (T(Body)[Body] << (Any++)[Expr]))) >>
+                    T(Env)[Env] * (T(Body)[Body] << (Any++)[Expr]) *
+                    T(FreeVarList)[FreeVarList])) >>
           [](Match& _) -> Node {
           // FIXME debug print
           std::cout << "compiling function: " << node_val(_(IRFun))
@@ -478,34 +477,33 @@ namespace miniml {
             return Seq
               << ((IRFun ^ node_val(_(IRFun)))
                   << funType << (Compile << _(ParamList))
-                  << (Body
-                      << entryPoint
-                      // TODO: Instructions for loading from environment here
-                      // FIXME: We need the free variable list to create
-                      // those instructions :/
-                      // main() may contain multiple expressions.
-                      << (Compile << (TODO << _[Expr]))
-                      // main() expected to return 0 for program success.
-                      << (Action
-                          << (CreateConst << returnId->clone() << Ti32
-                                          << (IRValue ^ "0")))
-                      << (Instr
-                          << (TerminatorOp << (Ret << returnId->clone())))));
+                  << (Body << entryPoint
+                           // main() may contain multiple expressions.
+                           << (Compile << (TODO << _[Expr]))
+                           // main() expected to return 0 for program success.
+                           << (Action
+                               << (CreateConst << returnId->clone() << Ti32
+                                               << (IRValue ^ "0")))
+                           << (Instr
+                               << (TerminatorOp
+                                   << (Ret << returnId->clone())))));
           } else {
+            Node envTy = Ident ^ node_val(_(Env));
+            Node envPtr = (_(ParamList)->front() / Ident)->clone();
+
             return Seq
               << ((IRFun ^ node_val(_(IRFun)))
                   << funType << (Compile << _(ParamList))
-                  << (Body
-                      << entryPoint
-                      // TODO: Instructions for loading from environment here
-                      // FIXME: We need the free variable list to create
-                      // those instructions :/
-
-                      // Lambdas can only contain a single expression.
-                      << (Compile << returnId << _(Expr))
-                      // MiniML has implicit return so must insert it here.
-                      << (Instr
-                          << (TerminatorOp << (Ret << returnId->clone())))));
+                  << (Body << entryPoint
+                           // Load freeVars from environment.
+                           << (Compile << envTy->clone() << envPtr->clone()
+                                       << _(FreeVarList) << Load)
+                           // Lambdas can only contain a single expression.
+                           << (Compile << returnId << _(Expr))
+                           // MiniML has implicit return so must insert it here.
+                           << (Instr
+                               << (TerminatorOp
+                                   << (Ret << returnId->clone())))));
           }
         },
 
@@ -538,7 +536,7 @@ namespace miniml {
         },
 
         /**
-         * Closure
+         * Create Closure
          */
         T(Compile)
             << (T(Ident)[Result] *
@@ -569,11 +567,10 @@ namespace miniml {
           Node funSlotPtr = Ident ^ "funSlot_" + uniqueId;
           Node funPtr = Ident ^ "funPtr_" + uniqueId;
 
-          // TODO: Handle free var and none freevar separately
           if (_(FreeVarList)->size() == 0) {
             // CLOSURE WITHOUT ENVIRONMENT.
             return Seq
-              // TODO: Malloc Closure.
+              // Malloc closure.
               << (Action
                   << (CreateConst << closureBytes << Ti64 << closureBytesValue))
               << (Instr
@@ -601,34 +598,28 @@ namespace miniml {
 
             // FIXME: dynamic calc of malloc size
             // FIXME: Assumes single integer
-            // FIXME: Not sure how to do it otherwise
             for (size_t i = 0; i < _(FreeVarList)->size(); i++) {
               // DO nothing
             }
-            size_t envByteCount = 4;
+            size_t envByteCount = 10;
 
             Node envBytesValue = IRValue ^ std::to_string(envByteCount);
             Node envBytes = Ident ^ _(CreateClosure)->fresh();
             Node envTy = Ident ^ node_val(_(Env));
 
             return Seq
-              // TODO: Malloc environment
+              // Malloc environment.
               << (Action << (CreateConst << envBytes << Ti64 << envBytesValue))
               << (Instr
                   << (MiscOp
                       << (Call << envPtr << funToCall
                                << (ArgList << envBytes->clone()))))
 
-              // TODO: ForEach FreeVar, do:
-              // TODO: Load freeVar.
-              // TODO: GEP freeVar slot in envPtr
-              // TODO: Store freeVar.
-              // TODO: This has to be done in a separate compile node :/
-              // << (Compile << (Load and Store FreeVars to environment ptr))
-              // _(Env) = ident for struct type
-              << (Compile << envTy->clone() << envPtr->clone() << FreeVarList)
+              // Store freeVars in environment.
+              << (Compile << envTy->clone() << envPtr->clone() << _(FreeVarList)
+                          << Store)
 
-              // TODO: Malloc Closure.
+              // Malloc closure.
               << (Action
                   << (CreateConst << closureBytes << Ti64 << closureBytesValue))
               << (Instr
@@ -706,13 +697,13 @@ namespace miniml {
         },
 
         /**
-         * FreeVarList
+         * FreeVarList (Populate environment)
          */
         T(Compile) << T(Ident)[Env] * T(Ident)[TPtr] *
-              T(FreeVarList)[FreeVarList] >>
+              T(FreeVarList)[FreeVarList] * T(Store) >>
           [](Match& _) -> Node {
           // FIXME: debug print
-          std::cout << "compiling freevarlist" << std::endl;
+          std::cout << "compiling freevarlist store" << std::endl;
           Node envPtr = _(TPtr);
           Node envTy = _(Env);
 
@@ -720,7 +711,7 @@ namespace miniml {
           for (size_t i = 0; i < _(FreeVarList)->size(); i++) {
             Node freeVar = _(FreeVarList)->at(i);
             Node ident = freeVar / Ident;
-            Node type = freeVar / Type;
+            Node type = getLLVMType(freeVar / Type / Type);
 
             Node tmp = Ident ^ _(FreeVarList)->fresh();
             Node freeVarSlot = Ident ^ _(FreeVarList)->fresh();
@@ -739,7 +730,59 @@ namespace miniml {
                                          << (IRValue ^ std::to_string(i)))))));
             // Store FV in env
             seq
-              << (Instr << (MemoryOp << (Store << tmp << type << freeVarSlot)));
+              << (Instr
+                  << (MemoryOp
+                      << (Store << tmp->clone() << freeVarSlot->clone())));
+          }
+
+          return seq;
+        },
+
+        /**
+         * FreeVarList (Environment -> Registers)
+         */
+        T(Compile) << T(Ident)[Env] * T(Ident)[TPtr] *
+              T(FreeVarList)[FreeVarList] * T(Load) >>
+          [](Match& _) -> Node {
+          // FIXME: debug print
+          std::cout << "compiling freevarlist load" << std::endl;
+          Node envPtr = _(TPtr);
+          Node envTy = _(Env);
+
+          Node seq = Seq;
+          for (size_t i = 0; i < _(FreeVarList)->size(); i++) {
+            Node freeVar = _(FreeVarList)->at(i);
+            Node ident = freeVar / Ident;
+            Node type = getLLVMType(freeVar / Type / Type);
+
+            Node tmp = Ident ^ _(FreeVarList)->fresh();
+            Node freeVarSlot = Ident ^ _(FreeVarList)->fresh();
+
+            // GEP FV slot in environment (need env_type, env_ptr and i)
+            seq
+              << (Instr
+                  << (MemoryOp
+                      << (GetElementPtr
+                          << freeVarSlot->clone() << envTy->clone()
+                          << envPtr->clone()
+                          << (OffsetList
+                              << (Offset << Ti32 << (IRValue ^ "0"))
+                              << (Offset << Ti32
+                                         << (IRValue ^ std::to_string(i)))))));
+            // Load FV from environment.
+            seq
+              << (Instr
+                  << (MemoryOp
+                      << (Load << tmp->clone() << type->clone()
+                               << freeVarSlot->clone())));
+            // Alloca
+            seq
+              << (Instr
+                  << (MemoryOp << (Alloca << ident->clone() << type->clone())));
+            // Store on function's stack
+            seq
+              << (Instr
+                  << (MemoryOp << (Store << tmp->clone() << ident->clone())));
           }
 
           return seq;

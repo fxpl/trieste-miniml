@@ -192,7 +192,8 @@ namespace miniml{
 
       inline const auto wf_functions =
         wf_freeVars
-        | (Program <<= IRFun++)
+        | (Top <<= IRProgram)
+        | (IRProgram <<= IRFun++)
         | (IRFun <<= Ident * Type * ParamList * Env * Body * FreeVarList)
         | (ParamList <<= Param++)
         | (Body <<= TopExpr++)
@@ -201,12 +202,7 @@ namespace miniml{
       
       inline const auto wf =
         wf_functions
-        // Remove symbol table references
-        | (FunDef <<= Ident * Type * Param * Expr * FreeVarList)
-        | (Param <<= Ident * Type)
-        | (Let <<= Ident * Type * Expr)
-        // WF
-        | (Program <<= (Env | IRFun)++[1])
+        | (IRProgram <<= (Env | IRFun)++[1])
         | (Env <<= Type++)
         | (Body <<= (TopExpr | Expr)++)
         | (TopExpr <<= (Let | Expr))
@@ -265,8 +261,8 @@ namespace miniml{
     inline const auto wf_operand = (Int | Ident);
     
     inline const auto wf =
-    (Top <<= Ident * Program)
-    | (Program <<= (Action | IRFun)++[1])
+    (Top <<= Ident * IRProgram)
+    | (IRProgram <<= (Action | IRFun)++[1])
     | (IRFun <<= TypeArrow * ParamList * Body)
       | (TypeArrow <<= (Ty1 >>= wf_llvm_types) * (Ty2 >>= wf_llvm_types))
       | (ParamList <<= Param++)

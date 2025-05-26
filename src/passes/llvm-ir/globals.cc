@@ -26,6 +26,12 @@ namespace miniml {
             if (def->type() == Let) {
               return Global ^ node_val(_(Ident));
             }
+
+            // Parameters from other functions are loaded from environment.
+            Node parent = _(Ident)->parent(FunDef);
+            if (def->type() == Param && def->parent(Fun)->front() != parent) {
+              return Global ^ node_val(_(Ident));
+            }
           }
           return _(Ident);
         },

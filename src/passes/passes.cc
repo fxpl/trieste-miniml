@@ -20,6 +20,7 @@
 #include "llvm-ir/globals.cc"
 #include "llvm-ir/main_function.cc"
 #include "llvm-ir/closure_conversion.cc"
+#include "llvm-ir/closure_globals.cc"
 #include "llvm-ir/compile.cc"
 #include "llvm-ir/blockify.cc"
 #include "llvm-ir/reverse_blocks.cc"
@@ -60,6 +61,7 @@ namespace miniml {
       globals(),
       main_function(),
       closure_conversion(),
+      closure_globals(),
       compile(),
       blockify(),
       reverse_blocks(),

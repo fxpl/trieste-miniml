@@ -18,7 +18,11 @@ namespace miniml {
       closures::wf_functions,
       dir::topdown | dir::once,
       {
-        In(Top) * (T(Program)[Program] << (Any++)[TopExpr]) >>
+        In(Top) * T(Program)[Program] >> [](Match& _) -> Node {
+          return Reapply << (IRProgram << *_(Program));
+        },
+
+        In(Top) * (T(IRProgram)[Program] << (Any++)[TopExpr]) >>
           [](Match& _) -> Node {
           Node main = IRFun ^ "main";
 

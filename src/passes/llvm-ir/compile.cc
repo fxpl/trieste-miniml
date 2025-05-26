@@ -36,7 +36,7 @@ namespace miniml {
         /**
          * Add compile node and assign tmp/register.
          */
-        In(Top) * Start * T(Program)[Program] * End >> [](Match& _) -> Node {
+        In(Top) * Start * T(IRProgram)[Program] * End >> [](Match& _) -> Node {
           Node result = Ident ^ _(Program)->fresh();
 
           return (Compile << result << _(Program));
@@ -45,7 +45,7 @@ namespace miniml {
         /**
          * Compile program and add compile nodes to its children.
          */
-        T(Compile) << T(Ident)[Ident] * T(Program)[Program] >>
+        T(Compile) << T(Ident)[Ident] * T(IRProgram)[Program] >>
           [](Match& _) -> Node {
           // FIXME: Debug print
           std::cout << "Compile" << std::endl;
@@ -716,8 +716,22 @@ namespace miniml {
             Node tmp = Ident ^ _(FreeVarList)->fresh();
             Node freeVarSlot = Ident ^ _(FreeVarList)->fresh();
 
-            // Load FV from enclosing scope
-            seq << (Instr << (MemoryOp << (Load << tmp << type << ident)));
+            // Get FV value.
+            if (ident == Global) {
+              // Load from enclosing scope.
+              seq
+                << (Instr
+                    << (MemoryOp
+                        << (Load << tmp << type->clone()
+                                 << (Ident ^ node_val(ident)))));
+            } else {
+              // Already a register.
+              seq
+                << (Instr
+                    << (ConversionOp
+                        << (BitCast << tmp << (Ident ^ node_val(ident))
+                                    << type->clone())));
+            }
             // GEP FV slot in environment (need env_type, env_ptr and i)
             seq
               << (Instr

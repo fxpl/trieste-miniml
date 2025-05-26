@@ -186,7 +186,7 @@ namespace miniml{
         check::wf
         | (FunDef <<= Ident * Type * Param * Expr * FreeVarList)[Ident]
           | (FreeVarList <<= FreeVar++)
-            | (FreeVar <<= (Ident >>= (Ident | Global)) * Type)
+            | (FreeVar <<= Ident * Type)
         | (Expr <<= Type * (Expr >>= (wf_expr | Global)))
         ;
 
@@ -199,8 +199,7 @@ namespace miniml{
         | (Body <<= TopExpr++)
         ;
 
-      
-      inline const auto wf =
+      inline const auto wf_closures =
         wf_functions
         | (IRProgram <<= (Env | IRFun)++[1])
         | (Env <<= Type++)
@@ -211,6 +210,11 @@ namespace miniml{
           | (FunCall <<= (Lhs >>= Expr) * (Rhs >>= Expr))
           | (ClosureCall <<= (Lhs >>= Expr) * (Rhs >>= Expr))
         | (Type <<= (Type >>= wf_types | ForAllTy | TPtr))
+        ;
+
+      inline const auto wf =
+        wf_closures
+        | (FreeVar <<= (Ident >>= (Ident | Global)) * Type)
         ;
     }
 

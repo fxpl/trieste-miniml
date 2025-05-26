@@ -19,7 +19,7 @@ namespace miniml {
   PassDef closure_conversion() {
     return {
       "closure_conversion",
-      closures::wf,
+      closures::wf_closures,
       // bottom-up so nested lambdas get lifted first
       dir::bottomup,
       {

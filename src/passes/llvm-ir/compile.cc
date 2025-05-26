@@ -360,9 +360,9 @@ namespace miniml {
           Node argIdent = Ident ^ _(Param)->fresh();
           Node funIdent = Ident ^ _(Param)->fresh();
 
-          // TODO: Need to create function type from the function's type
-          Node funRetTypeToken = _(Fun) / Type / Type / Ty1;
-          Node funArgTypeToken = _(Fun) / Type / Type / Ty2;
+          Node funArgTypeToken = _(Fun) / Type / Type / Ty1;
+          Node funRetTypeToken = _(Fun) / Type / Type / Ty2;
+
           Node retLLVMType = getLLVMType(funRetTypeToken);
           Node argLLVMType = getLLVMType(funArgTypeToken);
 

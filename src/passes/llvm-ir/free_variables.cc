@@ -1,6 +1,5 @@
 #include "../../miniml-lang.hh"
 #include "../internal.hh"
-#include "../llvm_utils.hh"
 #include "../utils.hh"
 #include "trieste/token.h"
 
@@ -44,10 +43,23 @@ namespace miniml {
 
               if (def->type() == Let) {
                 context->freeVars[ancestor].insert(_(Ident));
+              } else if (
+                def->type() == Param && def->parent(Fun)->front() != ancestor) {
+                context->freeVars[ancestor].insert(_(Ident));
               }
             }
           }
           return _(Ident);
+        },
+
+        // Ensure all FunDefs are appended with a FreeVarList
+        T(FunDef)[FunDef] >> [context](Match& _) -> Node {
+          Node funDef = _(FunDef);
+          if (!context->freeVars.contains(funDef)) {
+            context->freeVars[funDef];
+          }
+
+          return _(FunDef);
         },
 
         // Add a list of free variables to the function definition.

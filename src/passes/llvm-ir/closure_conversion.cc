@@ -44,10 +44,11 @@ namespace miniml {
                      << (Lift
                          << Program
                          << (lambda << _(Ident) << _(Type)
-                                    << (ParamList << (Param << (Ident ^ env)
+                                    << (ParamList << (Param << (Ident ^ "env")
                                                             << (Type << TPtr))
                                                   << _(Param))
-                                    << env->clone() << (Body << _(Expr))))
+                                    << env->clone() << (Body << _(Expr))
+                                    << _(FreeVarList)->clone()))
                      << (Type << TPtr)
                      << (CreateClosure << (Ident ^ node_val(lambda))
                                        << env->clone()
@@ -56,7 +57,7 @@ namespace miniml {
 
         In(Expr) * (T(App)[App] << T(Expr)[Fun] * T(Expr)[Param]) >>
           [](Match& _) -> Node {
-            // In miniML, everything but Print is a closure call.
+          // In miniML, everything but Print is a closure call.
           if (_(Fun) / Expr == Print) {
             return FunCall << *_(App);
           } else {

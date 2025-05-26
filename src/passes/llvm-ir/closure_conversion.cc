@@ -43,12 +43,14 @@ namespace miniml {
           return Seq << (Lift << IRProgram << env)
                      << (Lift
                          << IRProgram
-                         << (lambda << _(Ident) << _(Type)
-                                    << (ParamList << (Param << (Ident ^ "env")
-                                                            << (Type << TPtr))
-                                                  << _(Param))
-                                    << env->clone() << (Body << _(Expr))
-                                    << _(FreeVarList)->clone()))
+                         << (lambda
+                             << _(Type)
+                             << (ParamList
+                                 << (Param << _(Ident) << (Type << TPtr))
+                                 << (Param << (Ident ^ "env") << (Type << TPtr))
+                                 << _(Param))
+                             << env->clone() << (Body << _(Expr))
+                             << _(FreeVarList)->clone()))
                      << (Type << TPtr)
                      << (CreateClosure << (Ident ^ node_val(lambda))
                                        << env->clone()

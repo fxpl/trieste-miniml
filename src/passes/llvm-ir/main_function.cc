@@ -31,8 +31,7 @@ namespace miniml {
 
           // clang-format off
           return _(Program)
-            << (main << Ident
-                     // TODO: Fix realistic typing: main(void) -> i32
+            << (main // TODO: Fix realistic typing: main(void) -> i32
                      << (Type << (TypeArrow << TInt << TInt))
                      << ParamList
                      << Env

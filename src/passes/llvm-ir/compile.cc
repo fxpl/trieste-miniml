@@ -408,14 +408,16 @@ namespace miniml {
             << (Compile << argIdent << _(Param))
             // Fun type
             << (Action
-                << (CreateFunType << funTy << retLLVMType
-                                  << (IRTypeList << TPtr << argLLVMType)))
+                << (CreateFunType
+                    << funTy << retLLVMType
+                    << (IRTypeList << TPtr << TPtr << argLLVMType)))
             // Function call
             << (Instr
                 << (MiscOp
                     << (CallOpaque
                         << _(Result) << funTy->clone() << funPtr->clone()
-                        << (ArgList << envPtr->clone() << argIdent->clone()))));
+                        << (ArgList << closurePtr->clone() << envPtr->clone()
+                                    << argIdent->clone()))));
         },
 
         /**
@@ -448,8 +450,8 @@ namespace miniml {
          */
         T(Compile)
             << (T(IRFun)[IRFun]
-                << (T(Ident)[Ident] * T(Type)[Type] * T(ParamList)[ParamList] *
-                    T(Env)[Env] * (T(Body)[Body] << (Any++)[Expr]) *
+                << (T(Type)[Type] * T(ParamList)[ParamList] * T(Env)[Env] *
+                    (T(Body)[Body] << (Any++)[Expr]) *
                     T(FreeVarList)[FreeVarList])) >>
           [](Match& _) -> Node {
           // FIXME debug print

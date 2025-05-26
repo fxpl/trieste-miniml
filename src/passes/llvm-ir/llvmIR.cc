@@ -566,17 +566,13 @@ namespace miniml {
                         << std::endl;
 
               // Create function type.
-              // TODO: Convert trieste::token to llvm::type* in helper function.
-
-              // TODO: Fix return type (maybe this should be only returntype?)
               Node returnType = _(TypeArrow) / Ty2;
               llvm::Type* returnLLVMType = NULL;
               if (returnType == Ti32) {
                 returnLLVMType = context->builder.getInt32Ty();
               } else if (returnType == Ti1) {
                 returnLLVMType = context->builder.getInt1Ty();
-              } else if (returnType == TypeArrow) {
-                // Returns a function
+              } else if (returnType == TPtr) {
                 returnLLVMType = context->builder.getPtrTy();
               }
               assert(returnLLVMType);
@@ -624,7 +620,8 @@ namespace miniml {
              * Actions performed by LLVM IR builder.
              */
             // Get Type
-            T(Action) << (T(GetType) << T(Ident)[Result] * T(Ident)[IRType]) >>
+            T(Action)[Action]
+                << (T(GetType) << T(Ident)[Result] * T(Ident)[IRType]) >>
               [context](Match& _) -> Node {
               std::string valueId = node_val(_(IRType));
               llvm::Value* value = context->registers[valueId];
@@ -635,13 +632,15 @@ namespace miniml {
               std::string resultId = node_val(_(Result));
               context->types[resultId] = destType;
 
+              // FIXME: Debug print.
               std::cout << "Action - GetType" << std::endl;
 
-              return {};
+              return _(Action);
             },
 
             // Get Function
-            T(Action) << (T(GetFunction) << T(Ident)[Result] * T(Ident)[Fun]) >>
+            T(Action)[Action]
+                << (T(GetFunction) << T(Ident)[Result] * T(Ident)[Fun]) >>
               [context](Match& _) -> Node {
               std::string tmpIdent = node_val(_(Result));
               std::string functionName = node_val(_(Fun));
@@ -655,13 +654,48 @@ namespace miniml {
               std::cout << "Action - Storing fun: " << functionName
                         << " as: " << tmpIdent << std::endl;
 
-              return {};
+              return _(Action);
+            },
+
+            // Create Struct Type
+            T(Action)[Action]
+                << (T(CreateStructType)
+                    << T(Ident)[Result] * T(IRTypeList)[IRTypeList]) >>
+              [context](Match& _) -> Node {
+              std::vector<llvm::Type*> fieldTypes;
+              for (auto irType : *_(IRTypeList)) {
+                llvm::Type* llvmType = nullptr;
+                if (irType == Ti32) {
+                  llvmType = context->builder.getInt32Ty();
+                } else if (irType == Ti1) {
+                  llvmType = context->builder.getInt1Ty();
+                } else if (irType == TPtr) {
+                  llvmType = context->builder.getPtrTy();
+                }
+                assert(llvmType);
+
+                fieldTypes.push_back(llvmType);
+              }
+
+              std::string resultId = node_val(_(Result));
+              llvm::StructType* theStructType =
+                llvm::StructType::create(context->llvm_context, resultId);
+              theStructType->setBody(fieldTypes, false);
+              assert(theStructType);
+
+              context->types[resultId] = theStructType;
+
+              // FIXME: Debug print.
+              std::cout << "Action - Creating struct type: " << resultId
+                        << std::endl;
+
+              return _(Action);
             },
 
             // Create Function Type
-            T(Action)
+            T(Action)[Action]
                 << (T(CreateFunType) << T(Ident)[Result] *
-                      T(Ti1, Ti32, Ti64, TPtr, TypeArrow)[IRType] *
+                      T(Ti1, Ti32, Ti64, TPtr)[IRType] *
                       T(IRTypeList)[ParamList]) >>
               [context](Match& _) -> Node {
               Node returnType = _(IRType);
@@ -670,8 +704,7 @@ namespace miniml {
                 returnLLVMType = context->builder.getInt32Ty();
               } else if (returnType == Ti1) {
                 returnLLVMType = context->builder.getInt1Ty();
-              } else if (returnType == TypeArrow) {
-                // Returns a function
+              } else if (returnType == TPtr) {
                 returnLLVMType = context->builder.getPtrTy();
               }
               assert(returnLLVMType);
@@ -708,11 +741,11 @@ namespace miniml {
               std::cout << "Action - Creating funType at: " << resultId
                         << std::endl;
 
-              return {};
+              return _(Action);
             },
 
             // Create Constant
-            T(Action)
+            T(Action)[Action]
                 << (T(CreateConst)
                     << (T(Ident)[Ident] * T(Ti64, Ti32, Ti1)[Type] *
                         T(IRValue)[IRValue])) >>
@@ -737,7 +770,7 @@ namespace miniml {
               std::cout << "Action - Creating value: " << valueStr
                         << " at: " << regId << "\n";
 
-              return {};
+              return _(Action);
             },
 
             // Create Basic Block

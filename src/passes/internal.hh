@@ -194,7 +194,7 @@ namespace miniml{
         wf_freeVars
         | (Top <<= IRProgram)
         | (IRProgram <<= IRFun++)
-        | (IRFun <<= Ident * Type * ParamList * Env * Body * FreeVarList)
+        | (IRFun <<= Type * ParamList * Env * Body * FreeVarList)
         | (ParamList <<= Param++)
         | (Body <<= TopExpr++)
         ;

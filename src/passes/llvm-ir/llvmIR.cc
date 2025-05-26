@@ -14,6 +14,7 @@
 #pragma clang diagnostic ignored "-Wunused-parameter"
 #pragma clang diagnostic ignored "-Wshadow"
 #include "llvm/Support/raw_ostream.h"
+
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
@@ -28,32 +29,25 @@ namespace miniml {
   using namespace llvm;
 
   struct LLVMIRContext {
-    // Holds core data structures: Type and constant value tables.
+    // LLVM Code generation APIs:
+    // LLVMContext - Holds core data structures, Type and constant value tables.
+    // IRBuilder - Generates LLVM IR instructions.
+    // Module - Contains generated instructions, local and global value tables.
     llvm::LLVMContext llvm_context;
-    // Generates LLVM IR instructions.
     // FIXME: NoFolder is used to prevent constant folding.
     llvm::IRBuilder<NoFolder> builder;
-    // Contains generated instructions and local and global value tables.
     llvm::Module llvm_module;
-    // Named variables, for keeping track of function arguments.
-    std::map<std::string, llvm::Value*> namedVars;
-    // Main function
-    llvm::Function* currentFunction;
 
-    // Maps register identifiers to their LLVM IR values.
-    std::map<std::string, llvm::Value*> registers;
+    // Keeps track of generated BasicBlocks within program
+    std::map<std::string, llvm::BasicBlock*> basicBlocks;
+    // Keeps track of generated LLVM types within program
     std::map<std::string, llvm::Type*> types;
 
-    // Maps temporary identifiers to actual function names.
-    std::map<std::string, std::string> functions;
-
-    // Maps temporary identifiers basic blocks.
-    std::map<std::string, llvm::BasicBlock*> basicBlocks;
+    // Keeps track of generated LLVM values within a function
+    std::map<std::string, llvm::Value*> registers;
 
     LLVMIRContext()
     : builder(llvm_context), llvm_module("miniML", llvm_context) {}
-
-    Value* result;
 
     ~LLVMIRContext() {}
   };
@@ -68,7 +62,6 @@ namespace miniml {
    * This pass lowers to LLVM IR code.
    */
   PassDef generateLLVMIR() {
-    // Context shareable for all matches in the pass.
     auto context = std::make_shared<LLVMIRContext>();
 
     // FIXME: Debug print
@@ -122,8 +115,8 @@ namespace miniml {
               assert(result);
 
               context->registers[resultId] = result;
-              context->result = result;
 
+              // FIXME: Debug print
               std::cout << "BinaryOp - Add/Sub/Mul" << std::endl;
 
               return _(Instr);
@@ -156,8 +149,8 @@ namespace miniml {
                 context->builder.CreateAlloca(llvmType, nullptr, resultId);
 
               context->registers[resultId] = result;
-              context->result = result;
 
+              // FIXME: Debug print
               std::cout << "MemoryOp - Alloca" << std::endl;
 
               return _(Instr);
@@ -178,6 +171,7 @@ namespace miniml {
 
               context->builder.CreateStore(value, dest);
 
+              // FIXME: Debug print
               std::cout << "MemoryOp - Store" << std::endl;
 
               return _(Instr);
@@ -189,7 +183,6 @@ namespace miniml {
                     << (T(Load) << T(Ident)[Ident] * T(Ti32, Ti1, TPtr)[Type] *
                           T(Ident)[Src])) >>
               [context](Match& _) -> Node {
-              // TODO: Handle other types
               std::string resultId = node_val(_(Ident));
 
               llvm::Type* type = NULL;
@@ -208,8 +201,8 @@ namespace miniml {
               Value* result = context->builder.CreateLoad(type, src, resultId);
 
               context->registers[resultId] = result;
-              context->result = result;
 
+              // FIXME: Debug print
               std::cout << "MemoryOp - Load" << std::endl;
 
               return _(Instr);
@@ -251,6 +244,7 @@ namespace miniml {
                 context->builder.CreateGEP(type, value, offsets, resultId);
               context->registers[resultId] = result;
 
+              // FIXME: Debug print
               std::cout << "MemoryOp - GEP" << std::endl;
 
               return _(Instr);
@@ -288,8 +282,8 @@ namespace miniml {
                 context->builder.CreateCall(function, arguments, resultId);
 
               context->registers[resultId] = result;
-              context->result = result;
 
+              // FIXME: Debug print
               std::cout << "MiscOp - Call " << funId << std::endl;
 
               return _(Instr);
@@ -325,8 +319,8 @@ namespace miniml {
                 funTy, functionPtr, arguments, resultId);
 
               context->registers[resultId] = result;
-              context->result = result;
 
+              // FIXME: Debug print
               std::cout << "MiscOp - Call (Opaque)" << funId << std::endl;
 
               return _(Instr);
@@ -364,8 +358,8 @@ namespace miniml {
               assert(result);
 
               context->registers[resultId] = result;
-              context->result = result;
 
+              // FIXME: Debug print
               std::cout << "MiscOp - Compare" << std::endl;
 
               return _(Instr);
@@ -408,8 +402,8 @@ namespace miniml {
               phi->addIncoming(falseVal, falseBlock);
 
               context->registers[resultId] = phi;
-              context->result = phi;
 
+              // FIXME: Debug print
               std::cout << "MiscOp - Phi" << std::endl;
 
               return _(Instr);
@@ -456,6 +450,7 @@ namespace miniml {
 
               context->builder.CreateCondBr(cond, trueBlock, falseBlock);
 
+              // FIXME: Debug print
               std::cout << "TerminatorOp - Branch to blocks: " << trueId
                         << " or " << falseId << std::endl;
 
@@ -472,7 +467,7 @@ namespace miniml {
 
               context->builder.CreateBr(block);
 
-              // FIXME: debug print
+              // FIXME: Debug print
               std::cout << "TerminatorOp - Jump to block: " << blockId
                         << std::endl;
 
@@ -489,6 +484,7 @@ namespace miniml {
 
               context->builder.CreateRet(result);
 
+              // FIXME: Debug print
               std::cout << "TerminatorOp - Return" << std::endl;
 
               return _(Instr);
@@ -498,7 +494,7 @@ namespace miniml {
              * Conversion Operations
              */
             // BitCast (Custom Type)
-            T(Instr)
+            T(Instr)[Instr]
                 << (T(ConversionOp)
                     << (T(BitCast) << T(Ident)[Result] * T(Ident)[IRValue] *
                           T(Ident)[IRType])) >>
@@ -516,14 +512,14 @@ namespace miniml {
                 valueToConvert, targetType, resultId);
               context->registers[resultId] = result;
 
-              // FIXME: debug print
+              // FIXME: Debug print
               std::cout << "ConversionOp - BitCast" << std::endl;
 
-              return {};
+              return _(Instr);
             },
 
             // BitCast (Fixed Type)
-            T(Instr)
+            T(Instr)[Instr]
                 << (T(ConversionOp)
                     << (T(BitCast) << T(Ident)[Result] * T(Ident)[IRValue] *
                           T(Ti1, Ti32, Ti64, TPtr)[IRType])) >>
@@ -552,7 +548,7 @@ namespace miniml {
               // FIXME: debug print
               std::cout << "ConversionOp - BitCast" << std::endl;
 
-              return {};
+              return _(Instr);
             },
 
             /**
@@ -561,7 +557,7 @@ namespace miniml {
             T(IRFun)[Fun] << T(TypeArrow)[TypeArrow] * T(ParamList)[ParamList] *
                   T(Body) >>
               [context](Match& _) -> Node {
-              // FIXME: debug print
+              // FIXME: Debug print
               std::cout << "Fun - declaring fun: " << node_val(_(Fun))
                         << std::endl;
 
@@ -738,6 +734,7 @@ namespace miniml {
               std::string resultId = node_val(_(Result));
               context->types[resultId] = theFunctionType;
 
+              // FIXME: Debug print
               std::cout << "Action - Creating funType at: " << resultId
                         << std::endl;
 
@@ -764,9 +761,8 @@ namespace miniml {
               assert(value);
 
               context->registers[regId] = value;
-              context->result = value;
 
-              // FIXME: debug print
+              // FIXME: Debug print
               std::cout << "Action - Creating value: " << valueStr
                         << " at: " << regId << "\n";
 
@@ -778,15 +774,14 @@ namespace miniml {
               std::string funName = node_val(_(Block)->parent(IRFun));
               Function* function = context->llvm_module.getFunction(funName);
               assert(function);
-              context->currentFunction = function;
 
-              // FIXME: debug print
+              // FIXME: Debug print
               std::cout << "Block - Creating block: " << node_val(_(Block))
                         << " in: " << funName << "\n";
 
               std::string blockId = node_val(_(Block));
-              BasicBlock* block = BasicBlock::Create(
-                context->llvm_context, blockId, context->currentFunction);
+              BasicBlock* block =
+                BasicBlock::Create(context->llvm_context, blockId, function);
 
               context->basicBlocks[blockId] = block;
 
@@ -796,6 +791,8 @@ namespace miniml {
           }};
 
     pass.pre([context](Node) {
+      // TODO: Refactor these to separate file to decouple code gen from source
+      // language.
       /**
        * External functions
        */
@@ -837,31 +834,12 @@ namespace miniml {
     });
 
     pass.post([context](Node) {
-      // TODO: How to make sure this return is inserted at the end of main?
-      // Value* result = context->result;
-      // assert(result);
-
-      // llvm::Type* resultType = result->getType();
-
-      // Function* printFun = NULL;
-      // if (resultType == context->builder.getInt1Ty()) {
-      //   printFun = context->llvm_module.getFunction("native$printBool");
-      // } else if (resultType == context->builder.getInt32Ty()) {
-      //   printFun = context->llvm_module.getFunction("native$printInt");
-      // } else {
-      //   // TODO: Error! Printtype not implemented!
-      // }
-      // assert(printFun);
-
-      // context->builder.CreateCall(printFun, {context->result});
-
-      // // Return 0 to indicate success.
-      // context->builder.CreateRet(context->builder.getInt32(0));
-
+      // FIXME: Should verify all functions.
       Function* main = context->llvm_module.getFunction("main");
       verifyFunction(*main, &llvm::errs());
       verifyModule(context->llvm_module, &llvm::errs());
 
+      // TODO: Figure out how to output. into file? into clang via API?
       // FIXME: Temporarily write generated LLVM IR to file so can be compiled
       // by make command.
       std::error_code errorCode;

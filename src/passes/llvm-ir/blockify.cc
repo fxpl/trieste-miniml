@@ -30,7 +30,6 @@ namespace miniml {
   PassDef blockify() {
     return {
       "blockify",
-      // TODO: Use create WF
       LLVMIRBlockify::wf,
       (dir::topdown),
       {
@@ -57,7 +56,7 @@ namespace miniml {
           Node block = Block ^ node_val(_(Label));
           Node label = pop_front(_(Compile));
 
-          return Reapply << (Lift << Body << (block << label << _(Compile)));
+          return Lift << Body << (block << label << _(Compile));
         },
 
         /**
@@ -66,7 +65,7 @@ namespace miniml {
         T(Compile)[Compile] << Start * !T(Label) >> [](Match& _) -> Node {
           Node node = pop_front(_(Compile));
 
-          return ((Lift << Block << node) << _(Compile));
+          return Seq << (Lift << Block << node) << _(Compile);
         },
 
         /**

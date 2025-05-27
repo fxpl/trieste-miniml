@@ -92,7 +92,9 @@ namespace miniml {
               freeVarList->push_back(freeVar);
             }
 
+            Node body = funDef->pop_back();
             funDef->push_back(freeVarList);
+            funDef->push_back(body);
           }
 
           return _(Program);

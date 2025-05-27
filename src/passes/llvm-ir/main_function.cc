@@ -35,8 +35,8 @@ namespace miniml {
                      << (Type << (TypeArrow << TInt << TInt))
                      << ParamList
                      << Env
-                     << (Body << children)
-                     << FreeVarList);
+                     << FreeVarList
+                     << (Body << children));
           // clang-format on
         },
 

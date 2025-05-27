@@ -28,7 +28,7 @@ namespace miniml {
              (T(Fun)
               << (T(FunDef)
                   << (T(Ident)[Ident] * T(Type)[Type] * T(Param)[Param] *
-                      T(Expr)[Expr] * T(FreeVarList)[FreeVarList])))) >>
+                      T(FreeVarList)[FreeVarList] * T(Expr)[Expr])))) >>
           [](Match& _) -> Node {
           std::string uniqueId = std::string(_(Ident)->fresh().view());
           Node env = Env ^ "env_" + uniqueId;
@@ -40,6 +40,7 @@ namespace miniml {
 
           Node lambda = IRFun ^ "lambda_" + uniqueId;
 
+          // clang-format off
           return Seq << (Lift << IRProgram << env)
                      << (Lift
                          << IRProgram
@@ -48,13 +49,15 @@ namespace miniml {
                              << (ParamList
                                  << (Param << _(Ident) << (Type << TPtr))
                                  << (Param << (Ident ^ "env") << (Type << TPtr))
-                                 << _(Param))
-                             << env->clone() << (Body << _(Expr))
-                             << _(FreeVarList)->clone()))
+                                 << (_(Param)))
+                             << (env->clone())
+                             << (_(FreeVarList)->clone())
+                             << (Body << _(Expr))))
                      << (Type << TPtr)
                      << (CreateClosure << (Ident ^ node_val(lambda))
                                        << env->clone()
                                        << _(FreeVarList)->clone());
+          // clang-format on
         },
 
         In(Expr) * (T(App)[App] << T(Expr)[Fun] * T(Expr)[Param]) >>

@@ -448,11 +448,16 @@ namespace miniml {
         /**
          * Function Declaration
          */
+        // clang-format off
         T(Compile)
             << (T(IRFun)[IRFun]
-                << (T(Type)[Type] * T(ParamList)[ParamList] * T(Env)[Env] *
-                    (T(Body)[Body] << (Any++)[Expr]) *
-                    T(FreeVarList)[FreeVarList])) >>
+                << (T(Type)[Type]
+                  * T(ParamList)[ParamList]
+                  * T(Env)[Env]
+                  * T(FreeVarList)[FreeVarList]
+                  * (T(Body)[Body]
+                      << (Any++)[Expr]))) >>
+          // clang-format on
           [](Match& _) -> Node {
           // FIXME debug print
           std::cout << "compiling function: " << node_val(_(IRFun))

@@ -184,7 +184,7 @@ namespace miniml{
     
       inline const auto wf_freeVars = 
         check::wf
-        | (FunDef <<= Ident * Type * Param * Expr * FreeVarList)[Ident]
+        | (FunDef <<= Ident * Type * Param * FreeVarList * Expr)[Ident]
           | (FreeVarList <<= FreeVar++)
             | (FreeVar <<= Ident * Type)
         | (Expr <<= Type * (Expr >>= (wf_expr | Global)))
@@ -194,7 +194,7 @@ namespace miniml{
         wf_freeVars
         | (Top <<= IRProgram)
         | (IRProgram <<= IRFun++)
-        | (IRFun <<= Type * ParamList * Env * Body * FreeVarList)
+        | (IRFun <<= Type * ParamList * Env * FreeVarList * Body)
         | (ParamList <<= Param++)
         | (Body <<= TopExpr++)
         ;

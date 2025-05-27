@@ -17,6 +17,7 @@
 #include "typecheck/resolve_print.cc"
 
 #include "llvm-ir/free_variables.cc"
+#include "llvm-ir/propagate_free_variables.cc"
 #include "llvm-ir/globals.cc"
 #include "llvm-ir/main_function.cc"
 #include "llvm-ir/closure_conversion.cc"
@@ -58,6 +59,7 @@ namespace miniml {
 
       // LLVM IR generation
       free_variables(),
+      propagate_free_variables(),
       globals(),
       main_function(),
       closure_conversion(),

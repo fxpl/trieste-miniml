@@ -25,9 +25,7 @@ namespace miniml {
             Node type = freeVar / Type;
 
             auto defs = ident->lookup();
-            auto def = defs.front();
-
-            if (def->type() != Param) {
+            if (defs.empty() == true || defs.front()->type() != Param) {
               _(FreeVarList)
                 ->replace_at(i, FreeVar << (Global ^ node_val(ident)) << type);
             }

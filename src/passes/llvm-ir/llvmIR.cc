@@ -330,13 +330,9 @@ namespace miniml {
             T(Instr)[Instr]
                 << (T(MiscOp)
                     << (T(Icmp) << T(Ident)[Ident] * T(EQ, ULT)[Op] *
-                          T(Ti32)[Type] * T(Int, Ident)[Lhs] *
-                          T(Int, Ident)[Rhs])) >>
+                          T(Ti32, Ti1)[Type] * T(Ident)[Lhs] *
+                          T(Ident)[Rhs])) >>
               [context](Match& _) -> Node {
-              if (_(Type) != Ti32) {
-                return err(_(Type), "Not a valid type for comparison");
-              }
-
               std::string lhsId = node_val(_(Lhs));
               Value* lhs = context->registers[lhsId];
               assert(lhs);

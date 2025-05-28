@@ -262,8 +262,6 @@ namespace miniml{
     inline const auto wf_comparison = (EQ | NE | UGT | UGE | ULT | ULE | SGT | SGE | SLT | SLE);
     inline const auto wf_llvm_types = (Ti1 | Ti32 | Ti64 | TPtr | TypeArrow); 
 
-    inline const auto wf_operand = (Int | Ident);
-    
     inline const auto wf =
     (Top <<= Ident * IRProgram)
     | (IRProgram <<= (Action | IRFun)++[1])
@@ -284,11 +282,9 @@ namespace miniml{
     // LLVM IR instructions.
     | (Instr <<= (BinaryOp | MemoryOp | TerminatorOp | MiscOp | ConversionOp))
     | (BinaryOp <<= (Add | Sub | Mul))
-    // TODO: Refactor so operands should be Ident or IRValue,
-    //       never `Int` in order to decouple this IR from MiniML.
-      | (Add <<= (Result >>= Ident) * (Type >>= Ti32) * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
-      | (Sub <<= (Result >>= Ident) * (Type >>= Ti32) * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
-      | (Mul <<= (Result >>= Ident) * (Type >>= Ti32) * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
+      | (Add <<= (Result >>= Ident) * (Type >>= Ti32) * (Lhs >>= Ident) * (Rhs >>= Ident))
+      | (Sub <<= (Result >>= Ident) * (Type >>= Ti32) * (Lhs >>= Ident) * (Rhs >>= Ident))
+      | (Mul <<= (Result >>= Ident) * (Type >>= Ti32) * (Lhs >>= Ident) * (Rhs >>= Ident))
     | (MemoryOp <<= (Alloca | Load | Store | GetElementPtr))
       | (Alloca <<= (Result >>= Ident) * (Type >>= wf_llvm_types))
       | (Load <<= (Result >>= Ident) * (Type >>= wf_llvm_types) * (Src >>= Ident))
@@ -300,7 +296,7 @@ namespace miniml{
       | (Call <<= ((Result >>= Ident) * (Fun >>= Ident) * ArgList))
       | (CallOpaque <<= ((Result >>= Ident) * (IRType >>= Ident) * (Fun >>= Ident) * ArgList))
         | (ArgList <<= (Ident)++)
-      | (Icmp <<= (Result >>= Ident) * (Op >>= wf_comparison) * (Type >>= (Ti1 | Ti32)) * (Lhs >>= wf_operand) * (Rhs >>= wf_operand))
+      | (Icmp <<= (Result >>= Ident) * (Op >>= wf_comparison) * (Type >>= (Ti1 | Ti32)) * (Lhs >>= Ident) * (Rhs >>= Ident))
       | (Phi <<= (Result >>= Ident) * (Type >>= wf_llvm_types) * PredecessorList)
         | (PredecessorList <<= Predecessor++)
           | (Predecessor <<= (IRValue >>= Ident) * Label)
@@ -322,8 +318,6 @@ namespace miniml{
   }
 
   namespace LLVMIRGeneration {
-
-  inline const auto wf_operand = (Int | Ident);
 
   inline const auto wf =
     LLVMIRBlockify::wf

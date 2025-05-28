@@ -90,11 +90,8 @@ namespace miniml {
             T(Instr)[Instr]
                 << (T(BinaryOp)
                     << (T(Add, Sub, Mul)[Op] << T(Ident)[Ident] * T(Ti32) *
-                          T(Int, Ident)[Lhs] * T(Int, Ident)[Rhs])) >>
+                          T(Ident)[Lhs] * T(Ident)[Rhs])) >>
               [context](Match& _) -> Node {
-              // FIXME: Using T(Add,Sub,MUL) & T(Int,Ident) as match patterns is
-              // not scalable. Need to do something better
-
               std::string lhsId = node_val(_(Lhs));
               Value* lhs = context->registers[lhsId];
               assert(lhs);

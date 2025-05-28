@@ -60,3 +60,6 @@ compile-llvm:
 
 opt-llvm:
 	opt out/test.ll -O$O -S -o out/test2.ll; cat out/test2.ll
+
+test-llvm: all
+	touch out/test.trieste; > out/test.trieste; touch out/test.ll; > out/test.ll; ./build/miniml build llvmir_tests/test.miniml --log_level Debug -o out/test.trieste; clang out/test.ll -o out/test.out; ./out/test.out; echo $$?

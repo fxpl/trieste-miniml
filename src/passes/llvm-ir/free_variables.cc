@@ -50,7 +50,7 @@ namespace miniml {
           Node def = defs.front();
           if (
             (def->type() == Let) ||
-            (def->type() == Param &&
+            ((def->type() == Param || def->type() == FunDef) &&
              def->parent(Fun)->front() != enclosingFun)) {
             ctx->freeVars[enclosingFun].insert(ident);
             capturedNames->insert(name);

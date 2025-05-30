@@ -31,7 +31,7 @@ namespace miniml {
 
             // Parameters from other functions are loaded from environment.
             Node parent = _(Ident)->parent(FunDef);
-            if (def->type() == Param && def->parent(Fun)->front() != parent) {
+            if ((def->type() == Param || def->type() == FunDef) && def->parent(Fun)->front() != parent) {
               return Global ^ identName;
             }
           }

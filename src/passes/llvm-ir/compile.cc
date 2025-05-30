@@ -571,7 +571,7 @@ namespace miniml {
             Node env = createClosure / Env;
 
             // FIXME: Calculate env size based on FreeVarList.
-            size_t envByteCount = 10;
+            size_t envByteCount = 20;
 
             Node envBytesValue = IRValue ^ std::to_string(envByteCount);
             Node envBytes = Ident ^ createClosure->fresh();

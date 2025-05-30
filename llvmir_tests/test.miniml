@@ -48,3 +48,16 @@ let right = isEq(1)(1)(1);;
 print(right);;
 let wrong = isEq(1)(2)(3);;
 print(wrong = false);;
+
+let sum = 1 + (if true then (if false then 3 else 4) else 5) + 6;;
+print((sum = 11));;
+
+let div = fun div (x:int) is 
+    fun g (y:int) is
+        if x < y then
+            0
+        else
+            1 + div(x - y) y;;
+
+let ans = div(16)(3);;
+print((ans = 5));;

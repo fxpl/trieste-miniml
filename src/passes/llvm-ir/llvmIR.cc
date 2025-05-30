@@ -598,6 +598,35 @@ namespace miniml {
               return _(Action);
             },
 
+            // Get Type Size
+            T(Action) << T(GetSizeOfType)[GetSizeOfType] >>
+              [ctx](Match& _) -> Node {
+              Node getTypeSize = _(GetSizeOfType);
+              Node result = getTypeSize / Result;
+              Node desiredType = getTypeSize / Type;
+              Node typeToFindSizeOf = getTypeSize / IRType;
+
+              std::string resultId = node_val(result);
+              std::string typeId = node_val(typeToFindSizeOf);
+              llvm::Type* type = ctx->types[typeId];
+              assert(type);
+
+              auto dl = llvm::DataLayout(&ctx->llvm_module);
+              auto typeSize = dl.getTypeStoreSize(type);
+
+              llvm::Value* value = nullptr;
+              if (desiredType == Ti32) {
+                value = ctx->builder.getInt32(typeSize);
+              } else if (desiredType == Ti64) {
+                value = ctx->builder.getInt64(typeSize);
+              }
+              assert(value);
+
+              ctx->registers[resultId] = value;
+
+              return NoChange;
+            },
+
             // Create Basic Block
             In(Body) * T(Block)[Block] >> [ctx](Match& _) -> Node {
               std::string funName = node_val(_(Block)->parent(IRFun));

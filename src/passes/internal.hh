@@ -232,7 +232,7 @@ namespace miniml{
         | (Param <<= Ident * (Type >>= wf_llvm_types))
       | (Body <<= (Instr | Label | Action)++[1])
     // Builder actions, which aren't LLVM IR instructions.
-    | (Action <<= (CreateConst | CreateStructType | CreateFunType | GetFunction | GetType))
+    | (Action <<= (CreateConst | CreateStructType | CreateFunType | GetFunction | GetType | GetSizeOfType))
       | (CreateConst <<= Ident * (Type >>= Ti64 | Ti32 | Ti1) * IRValue)
       | (CreateStructType <<= Ident * IRTypeList)
         | (IRTypeList <<= wf_llvm_types++)
@@ -240,6 +240,7 @@ namespace miniml{
         | (IRTypeList <<= wf_llvm_types++)
       | (GetFunction <<= (Result >>= Ident) * (Fun >>= Ident))
       | (GetType <<= (Result >>= Ident) * (IRType >>= Ident))
+      | (GetSizeOfType <<= (Result >>= Ident) * (Type >>= (Ti32 | Ti64)) * (IRType >>= Ident))
     // LLVM IR instructions.
     | (Instr <<= (BinaryOp | MemoryOp | TerminatorOp | MiscOp | ConversionOp))
     | (BinaryOp <<= (Add | Sub | Mul))

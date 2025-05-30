@@ -528,9 +528,6 @@ namespace miniml {
 
           Node allocatorFun = Ident ^ "malloc";
 
-          // FIXME: Assumes a ptr is i64 = 8 Bytes.
-          size_t closureByteCount = 20;
-          Node closureBytesValue = IRValue ^ std::to_string(closureByteCount);
           Node closureBytes = Ident ^ createClosure->fresh();
           Node closurePtr = _(Result);
           Node closureTy = Ident ^ "ClosureTy";
@@ -544,9 +541,8 @@ namespace miniml {
           Node funPtr = Ident ^ "funPtr_" + uniqueId;
 
           // clang-format off
-          Node createClosByteSize =
-            (Action
-             << (CreateConst << closureBytes << Ti64 << closureBytesValue));
+          Node getClosureSize =
+            (Action << (GetSizeOfType << closureBytes << Ti64 << closureTy));
           Node allocateClosure =
             (Instr
              << (MiscOp
@@ -570,16 +566,12 @@ namespace miniml {
           if (freeVarList->size() > 0) {
             Node env = createClosure / Env;
 
-            // FIXME: Calculate env size based on FreeVarList.
-            size_t envByteCount = 20;
-
-            Node envBytesValue = IRValue ^ std::to_string(envByteCount);
             Node envBytes = Ident ^ createClosure->fresh();
             Node envTy = Ident ^ node_val(env);
 
             // clang-format off
-            Node createEnvByteSize =
-              (Action << (CreateConst << envBytes << Ti64 << envBytesValue));
+            Node getEnvSize =
+              (Action << (GetSizeOfType << envBytes << Ti64 << envTy));
             Node allocateEnv =
               (Instr
                << (MiscOp
@@ -594,7 +586,7 @@ namespace miniml {
                 << (MemoryOp
                     << (GetElementPtr
                         << envSlotPtr
-                        << closureTy
+                        << closureTy->clone()
                         << closurePtr->clone()
                         << (OffsetList << (Offset << Ti32 << (IRValue ^ "0"))
                                        << (Offset << Ti32 << (IRValue ^ "0"))))));
@@ -603,9 +595,9 @@ namespace miniml {
               << (MemoryOp
                   << (Store << envPtr->clone() << envSlotPtr->clone())));
 
-            return Seq << createClosByteSize
+            return Seq << getClosureSize
                        << allocateClosure
-                       << createEnvByteSize
+                       << getEnvSize
                        << allocateEnv
                        << storeFreeVarsInEnv
                        << GEPEnvSlotInClosure
@@ -614,7 +606,7 @@ namespace miniml {
                        << getFunPtr
                        << storeFunPtrInClosure;
           } else {
-            return Seq << createClosByteSize
+            return Seq << getClosureSize
                        << allocateClosure
                        << GEPFunSlotInClosure
                        << getFunPtr

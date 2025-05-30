@@ -134,6 +134,7 @@ namespace miniml {
   inline const auto CreateFunType = TokenDef("create_function_type");
   inline const auto GetFunction = TokenDef("get_function");
   inline const auto GetType = TokenDef("get_type");
+  inline const auto GetSizeOfType = TokenDef("get_sizeof_type");
 
   // LLVM IR Types
   inline const auto IRType = TokenDef("ir_type");

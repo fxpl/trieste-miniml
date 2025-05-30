@@ -1,20 +1,69 @@
 #pragma once
+
 #include "../miniml-lang.hh"
 
-namespace miniml {
-    using namespace trieste;
+// LLVM code builder
+/**
+ * This is a workaround to prevent warnings from LLVM libraries
+ * being treated as errors by CMake.
+ */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wshadow"
 
-    /**
-     * Converts a miniML type to an LLVM IR type.
-     * @param type The miniML type token to convert.
-     * @return The LLVM IR type token.
-     */ 
-     Node getLLVMType(Node type);
-     
-     /**
-      * Pops and returns the first child of a Node.
-      * @param node parent node to pop first child of.
-      * @return the first child node.
-      */ 
-    Node pop_front(Node type);
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/NoFolder.h> // Ignore constant folding for educational purposes
+#pragma clang diagnostic pop
+
+namespace miniml {
+  using namespace trieste;
+  using namespace llvm;
+
+  struct LLVMIRContext {
+    // LLVM Code generation APIs:
+    // LLVMContext - Holds core data structures, Type and constant value tables.
+    // IRBuilder - Generates LLVM IR instructions.
+    // Module - Contains generated instructions, local and global value tables.
+    llvm::LLVMContext llvm_context;
+    // FIXME: NoFolder is used to prevent constant folding.
+    llvm::IRBuilder<NoFolder> builder;
+    llvm::Module llvm_module;
+
+    // Keeps track of generated BasicBlocks within program
+    std::map<std::string, llvm::BasicBlock*> basicBlocks;
+    // Keeps track of generated LLVM types within program
+    std::map<std::string, llvm::Type*> types;
+
+    // Keeps track of generated LLVM values within a function
+    std::map<std::string, llvm::Value*> registers;
+
+    LLVMIRContext()
+    : builder(llvm_context), llvm_module("miniML", llvm_context) {}
+
+    ~LLVMIRContext() {}
+  };
+
+  /**
+   * Converts a miniML type token to an LLVM IR type token.
+   * @param type The miniML type token to convert.
+   * @return The LLVM IR type token.
+   */
+  Node getLLVMType(Node type);
+
+  /**
+   * Creates a LLVM IR type from a miniML type token.
+   * @param ctx reference to LLVM context.
+   * @param type The miniML type token to convert.
+   * @return The LLVM IR type.
+   */
+  llvm::Type* createLLVMType(std::shared_ptr<LLVMIRContext> ctx, Node type);
+
+  /**
+   * Pops and returns the first child of a Node.
+   * @param node parent node to pop first child of.
+   * @return the first child node.
+   */
+  Node pop_front(Node type);
 }

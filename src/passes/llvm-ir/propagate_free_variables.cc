@@ -23,13 +23,13 @@ namespace miniml {
           Node ident = freeVar / Ident;
           std::string name = node_val(ident);
 
-          Node enclosingScope = ident->scope()->scope();
-          if (enclosingScope != Fun) {
+          Node enclosingFun = ident->scope()->scope();
+          if (enclosingFun != Fun) {
             return freeVar;
           }
 
-          if (ident->lookup(enclosingScope).empty()) {
-            Node enclosingFreeVars = enclosingScope / FunDef / FreeVarList;
+          if (ident->lookup(enclosingFun).empty()) {
+            Node enclosingFreeVars = enclosingFun / FunDef / FreeVarList;
             for (Node enclosedFreeVar : *enclosingFreeVars) {
               std::string enclosedName = node_val(enclosedFreeVar / Ident);
               if (name == enclosedName) {

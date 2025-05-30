@@ -165,7 +165,7 @@ namespace miniml {
   inline const auto Src = TokenDef("src");
   inline const auto Dst = TokenDef("dst");
   inline const auto Result = TokenDef("result");
-  inline const auto TODO = TokenDef("TODO", flag::print);
+  inline const auto PropagateCompile = TokenDef("propagate_compile");
   inline const auto ArgList = TokenDef("argument_list");
   inline const auto OffsetList = TokenDef("offset_list");
   inline const auto Offset = TokenDef("offset");

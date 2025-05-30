@@ -39,20 +39,14 @@ namespace miniml {
         In(IRFun) * (T(Body)[Body] << (Start * !T(Block, Compile))) >>
           [](Match& _) -> Node {
           auto children = *_(Body);
-          _(Body)->erase(_(Body)->begin(), _(Body)->end());
 
-          return _(Body) << (Compile << children);
+          return Body << (Compile << children);
         },
 
         /**
          * Create new block in current function.
          */
         T(Compile)[Compile] << Start * T(Label)[Label] >> [](Match& _) -> Node {
-          // FIXME: It's more Trieste-like to bind a matched forest of subtrees:
-          // Example, this matches everything between two labels:
-          // (T(Label) * (Any * --T(Label))++ * Any)[Block]
-          // Should be usable to neatly split children of compile node.
-          // Note: Needs _[Block] to deref. _(Block) derefs first child.
           Node block = Block ^ node_val(_(Label));
           Node label = pop_front(_(Compile));
 

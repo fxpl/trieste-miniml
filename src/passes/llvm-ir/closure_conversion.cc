@@ -23,40 +23,44 @@ namespace miniml {
       // bottom-up so nested lambdas get lifted first
       dir::bottomup,
       {
-        In(Expr) *
-            (T(Type) *
-             (T(Fun)
-              << (T(FunDef)
-                  << (T(Ident)[Ident] * T(Type)[Type] * T(Param)[Param] *
-                      T(FreeVarList)[FreeVarList] * T(Expr)[Expr])))) >>
-          [](Match& _) -> Node {
-          std::string uniqueId = std::string(_(Ident)->fresh().view());
-          Node env = Env ^ "env_" + uniqueId;
+        In(Expr) * (T(Type) * T(Fun)[Fun]) >> [](Match& _) -> Node {
+          Node fun = _(Fun);
+          Node funDef = fun / FunDef;
+          Node internalFunName = funDef / Ident;
+          Node funType = funDef / Type;
+          Node param = funDef / Param;
+          Node freeVarList = funDef / FreeVarList;
+          Node expr = funDef / Expr;
 
-          for (Node freeVar : *_(FreeVarList)) {
-            Node type = freeVar->back();
-            env->push_back(type->clone());
+          std::string uniqueId = std::string(internalFunName->fresh().view());
+          Node env = Env ^ "env_" + uniqueId;
+          for (Node freeVar : *freeVarList) {
+            Node FreeVarType = freeVar->back();
+            env->push_back(FreeVarType->clone());
           }
 
           Node lambda = IRFun ^ "lambda_" + uniqueId;
+          Node lambdaId = Ident ^ node_val(lambda);
+          Node envName = (Ident ^ "env");
+
+          Node pointerType = Type << TPtr;
 
           // clang-format off
           return Seq << (Lift << IRProgram << env)
-                     << (Lift
-                         << IRProgram
+                     << (Lift << IRProgram
                          << (lambda
-                             << _(Type)
+                             << funType
                              << (ParamList
-                                 << (Param << _(Ident) << (Type << TPtr))
-                                 << (Param << (Ident ^ "env") << (Type << TPtr))
-                                 << (_(Param)))
+                                 << (Param << internalFunName << pointerType)
+                                 << (Param << envName << pointerType->clone())
+                                 << (param))
                              << (env->clone())
-                             << (_(FreeVarList)->clone())
-                             << (Body << _(Expr))))
-                     << (Type << TPtr)
-                     << (CreateClosure << (Ident ^ node_val(lambda))
+                             << (freeVarList->clone())
+                             << (Body << expr)))
+                     << pointerType->clone()
+                     << (CreateClosure << lambdaId
                                        << env->clone()
-                                       << _(FreeVarList)->clone());
+                                       << freeVarList->clone());
           // clang-format on
         },
 

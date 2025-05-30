@@ -29,10 +29,10 @@ namespace miniml {
         // Find free variables and their function definition.
         In(Expr) * T(Ident)[Ident] >> [ctx](Match& _) -> Node {
           Node ident = _(Ident);
-          std::string name = node_val(_(Ident));
+          std::string name = node_val(ident);
 
-          Node enclosingScope = ident->parent(FunDef);
-          if (enclosingScope == nullptr) {
+          Node enclosingFun = ident->parent(FunDef);
+          if (enclosingFun == nullptr) {
             return ident;
           }
 
@@ -41,7 +41,8 @@ namespace miniml {
             return ident;
           }
 
-          std::set<std::string>* capturedNames = &ctx->freeVarNames[enclosingScope];
+          std::set<std::string>* capturedNames =
+            &ctx->freeVarNames[enclosingFun];
           if (capturedNames->contains(name)) {
             return ident;
           }
@@ -50,16 +51,12 @@ namespace miniml {
           if (
             (def->type() == Let) ||
             (def->type() == Param &&
-             def->parent(Fun)->front() != enclosingScope)) {
-            std::cout << "Found free variable: " << name
-                      << " in function definition: " << node_val(enclosingScope)
-                      << std::endl;
-
-            ctx->freeVars[enclosingScope].insert(ident);
+             def->parent(Fun)->front() != enclosingFun)) {
+            ctx->freeVars[enclosingFun].insert(ident);
             capturedNames->insert(name);
           }
 
-          return ident;
+          return NoChange;
         },
 
         // Ensure all FunDefs are appended with a FreeVarList
@@ -71,27 +68,27 @@ namespace miniml {
             ctx->freeVarNames[funDef];
           }
 
-          return _(FunDef);
+          return NoChange;
         },
 
         // Add a list of free variables to the function definition.
         T(Program)[Program] >> [ctx](Match& _) -> Node {
           for (auto pair : ctx->freeVars) {
             Node funDef = pair.first;
+            auto freeIdents = pair.second;
             Node freeVarList = FreeVarList;
 
-            for (auto ident : pair.second) {
-              Node expr = ident->parent();
-              Node exprId = expr->back();
-              Node exprTy = expr->front();
+            for (auto ident : freeIdents) {
+              Node type = ident->parent() / Type;
               Node freeVar = FreeVar;
 
-              freeVar->push_back(exprId->clone());
-              freeVar->push_back(exprTy->clone());
+              freeVar->push_back(ident->clone());
+              freeVar->push_back(type->clone());
 
               freeVarList->push_back(freeVar);
             }
 
+            // Keep Body as Fun's last child for readability.
             Node body = funDef->pop_back();
             funDef->push_back(freeVarList);
             funDef->push_back(body);

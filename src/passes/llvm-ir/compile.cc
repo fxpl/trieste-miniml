@@ -221,7 +221,7 @@ namespace miniml {
           if (comparison == Equals) {
             op = EQ;
           } else if (comparison == LT) {
-            op = ULT;
+            op = SLT;
           } else {
             return err(comparison, "comparison operator not supported");
           }

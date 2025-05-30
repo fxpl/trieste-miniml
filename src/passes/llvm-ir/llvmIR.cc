@@ -254,7 +254,7 @@ namespace miniml {
             // Compare
             T(Instr)[Instr]
                 << (T(MiscOp)
-                    << (T(Icmp) << T(Ident)[Ident] * T(EQ, ULT)[Op] *
+                    << (T(Icmp) << T(Ident)[Ident] * T(EQ, ULT, SLT)[Op] *
                           T(Ti32, Ti1)[Type] * T(Ident)[Lhs] *
                           T(Ident)[Rhs])) >>
               [ctx](Match& _) -> Node {
@@ -269,12 +269,15 @@ namespace miniml {
               std::string resultId = node_val(_(Ident));
 
               Value* result = NULL;
-              if (_(Op) == EQ) {
+              Node op = _(Op);
+              if (op == EQ) {
                 result = ctx->builder.CreateICmpEQ(lhs, rhs, resultId);
-              } else if (_(Op) == ULT) {
+              } else if (op == ULT) {
                 result = ctx->builder.CreateICmpULT(lhs, rhs, resultId);
+              } else if (op == SLT) {
+                result = ctx->builder.CreateICmpSLT(lhs, rhs, resultId);
               } else {
-                return err(_(Op), "Unknown comparison operator");
+                return err(op, "Unknown comparison operator");
               }
               assert(result);
 

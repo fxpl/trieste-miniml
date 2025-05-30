@@ -207,8 +207,8 @@ namespace miniml{
         | (TopExpr <<= (Let | Expr))
         | (Expr <<= Type * (Expr >>= ((wf_expr - App) | Global | CreateClosure | ClosureCall | FunCall)))
           | (CreateClosure <<= (Fun >>= Ident) * Env * FreeVarList)
-          | (FunCall <<= (Lhs >>= Expr) * (Rhs >>= Expr))
-          | (ClosureCall <<= (Lhs >>= Expr) * (Rhs >>= Expr))
+          | (FunCall <<= (Fun >>= Expr) * (Param >>= Expr))
+          | (ClosureCall <<= (Fun >>= Expr) * (Param >>= Expr))
         | (Type <<= (Type >>= wf_types | ForAllTy | TPtr))
         ;
 
@@ -220,45 +220,6 @@ namespace miniml{
 
   namespace LLVMIRCompilation{
 
-    // FIXME: Only for reference.
-    //        Manually unfolded WF from typechecker
-    inline const auto wf_fresh =
-    (Top <<= File)
-    | (File <<= Program)
-    | (Program <<= TopExpr++)
-    | (TopExpr <<= (Let | Expr))
-    | (Let <<= Ident * Type * Expr)
-    | (Expr <<= Type * (Expr >>= wf_expr))
-    | (If <<= Expr * Expr * Expr)
-    | (Fun <<= FunDef)
-    | (FunDef <<= Ident * Type * Param * Expr)
-    | (Param <<= Ident * Type)
-    | (App <<= (Lhs >>= Expr) * (Rhs >>= Expr))
-    | (Mul <<= (Lhs >>= Expr) * (Rhs >>= Expr))
-    | (Add <<= (Lhs >>= Expr) * (Rhs >>= Expr))
-    | (Sub <<= (Lhs >>= Expr) * (Rhs >>= Expr))
-    | (LT <<= (Lhs >>= Expr) * (Rhs >>= Expr))
-    | (Equals <<= (Lhs >>= Expr) * (Rhs >>= Expr))
-    | (Annotation <<= Type >>= (wf_types | TNone))
-    | (TypeArrow <<= (Ty1 >>= wf_types) * (Ty2 >>= wf_types))
-    | (Type <<= (Type >>= wf_types | ForAllTy))
-    | (ForAllTy <<= TVars * Type)
-    | (TVars <<= TVar++)
-    ;
-
-    
-
-    // eq: equal
-    // ne: not equal
-    // ugt: unsigned greater than
-    // uge: unsigned greater or equal
-    // ult: unsigned less than
-    // ule: unsigned less or equal
-    // sgt: signed greater than
-    // sge: signed greater or equal
-    // slt: signed less than
-    // sle: signed less or equal
-    // Unsigned
     inline const auto wf_comparison = (EQ | NE | UGT | UGE | ULT | ULE | SGT | SGE | SLT | SLE);
     inline const auto wf_llvm_types = (Ti1 | Ti32 | Ti64 | TPtr | TypeArrow); 
 

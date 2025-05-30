@@ -19,15 +19,17 @@ namespace miniml {
       {
         In(CreateClosure) * T(FreeVarList)[FreeVarList] >>
           [](Match& _) -> Node {
-          for (size_t i = 0; i < _(FreeVarList)->size(); i++) {
-            Node freeVar = _(FreeVarList)->at(i);
+          Node freeVarList = _(FreeVarList);
+
+          for (size_t i = 0; i < freeVarList->size(); i++) {
+            Node freeVar = freeVarList->at(i);
             Node ident = freeVar / Ident;
             Node type = freeVar / Type;
 
             auto defs = ident->lookup();
             if (defs.empty() == true || defs.front()->type() != Param) {
-              _(FreeVarList)
-                ->replace_at(i, FreeVar << (Global ^ node_val(ident)) << type);
+              freeVarList->replace_at(
+                i, FreeVar << (Global ^ node_val(ident)) << type);
             }
           }
 

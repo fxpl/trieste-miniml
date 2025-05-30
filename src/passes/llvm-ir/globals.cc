@@ -19,18 +19,20 @@ namespace miniml {
       {
         // Find free variables and their function definition.
         In(Expr) * T(Ident)[Ident] >> [](Match& _) -> Node {
-          auto defs = _(Ident)->lookup();
+          Node ident = _(Ident);
+          std::string identName = node_val(ident);
+          auto defs = ident->lookup();
           if (!defs.empty()) {
             auto def = defs.front();
 
             if (def->type() == Let) {
-              return Global ^ node_val(_(Ident));
+              return Global ^ identName;
             }
 
             // Parameters from other functions are loaded from environment.
             Node parent = _(Ident)->parent(FunDef);
             if (def->type() == Param && def->parent(Fun)->front() != parent) {
-              return Global ^ node_val(_(Ident));
+              return Global ^ identName;
             }
           }
           return _(Ident);

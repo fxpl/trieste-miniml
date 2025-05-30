@@ -35,7 +35,7 @@ namespace miniml {
           std::string uniqueId = std::string(internalFunName->fresh().view());
           Node env = Env ^ "env_" + uniqueId;
           for (Node freeVar : *freeVarList) {
-            Node FreeVarType = freeVar->back();
+            Node FreeVarType = freeVar / Type;
             env->push_back(FreeVarType->clone());
           }
 

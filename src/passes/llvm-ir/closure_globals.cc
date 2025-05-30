@@ -33,7 +33,7 @@ namespace miniml {
             }
           }
 
-          return _(FreeVarList);
+          return freeVarList;
         },
       }};
   }

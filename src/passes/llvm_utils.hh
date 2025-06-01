@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../miniml-lang.hh"
+#include "../llvm-lang.hh"
 
 // LLVM code builder
 /**
@@ -17,7 +17,7 @@
 #include <llvm/IR/NoFolder.h> // Ignore constant folding for educational purposes
 #pragma clang diagnostic pop
 
-namespace miniml {
+namespace llvmir {
   using namespace trieste;
   using namespace llvm;
 
@@ -46,13 +46,6 @@ namespace miniml {
   };
 
   /**
-   * Converts a miniML type token to an LLVM IR type token.
-   * @param type The miniML type token to convert.
-   * @return The LLVM IR type token.
-   */
-  Node getLLVMType(Node type);
-
-  /**
    * Creates a LLVM IR type from a miniML type token.
    * @param ctx reference to LLVM context.
    * @param type The miniML type token to convert.
@@ -61,9 +54,9 @@ namespace miniml {
   llvm::Type* createLLVMType(std::shared_ptr<LLVMIRContext> ctx, Node type);
 
   /**
-   * Pops and returns the first child of a Node.
-   * @param node parent node to pop first child of.
-   * @return the first child node.
+   * Gets the value of a Node.
+   * @param node node to get value from.
+   * @return the node's value.
    */
-  Node pop_front(Node type);
+  std::string node_val(Node node);
 }

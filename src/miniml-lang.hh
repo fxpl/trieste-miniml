@@ -89,97 +89,26 @@ namespace miniml {
   inline const auto Ty21 = TokenDef("ty21");
   inline const auto Ty22 = TokenDef("ty22");
   inline const auto Constr = TokenDef("constraint");
+  inline const auto Result = TokenDef("result");
 
   /**
-   * LLVM IR tokens
+   * Compilation to LLVM IR
    */
   inline const auto Compile = TokenDef("compile");
-
-  inline const auto Instr = TokenDef("instr");
-  inline const auto Label = TokenDef("label", flag::print);
-  inline const auto Block = TokenDef("basic_block", flag::print);
-  inline const auto IRFun = TokenDef("ir_function", flag::print | flag::symtab);
-
-  // BinaryOps
-  inline const auto BinaryOp = TokenDef("binary_op");
-
-  // MemoryOps
-  inline const auto MemoryOp = TokenDef("memory_op");
-  inline const auto Alloca = TokenDef("alloca");
-  inline const auto Load = TokenDef("load");
-  inline const auto Store = TokenDef("store");
-  inline const auto GetElementPtr = TokenDef("get_element_ptr");
-
-  // TerminatorOps
-  inline const auto TerminatorOp = TokenDef("terminator_op");
-  inline const auto Branch = TokenDef("branch");
-  inline const auto Jump = TokenDef("jump");
-  inline const auto Ret = TokenDef("return");
-
-  // MiscOps
-  inline const auto MiscOp = TokenDef("misc_op");
-  inline const auto Call = TokenDef("call");
-  inline const auto CallOpaque = TokenDef("call_opaque");
-  inline const auto Icmp = TokenDef("icmp");
-  inline const auto Phi = TokenDef("phi");
-
-  // ConversionOps
-  inline const auto ConversionOp = TokenDef("conversion_op");
-  inline const auto BitCast = TokenDef("bitcast");
-
-  // LLVM Builder actions (not LLVM IR instructions)
-  inline const auto Action = TokenDef("action");
-  inline const auto CreateConst = TokenDef("create_const");
-  inline const auto CreateStructType = TokenDef("create_struct_type");
-  inline const auto CreateFunType = TokenDef("create_function_type");
-  inline const auto GetFunction = TokenDef("get_function");
-  inline const auto GetType = TokenDef("get_type");
-  inline const auto GetSizeOfType = TokenDef("get_sizeof_type");
-
-  // LLVM IR Types
-  inline const auto IRType = TokenDef("ir_type");
-  inline const auto Ti1 = TokenDef("i1");
-  inline const auto Ti32 = TokenDef("i32");
-  inline const auto Ti64 = TokenDef("i64");
-  inline const auto TPtr = TokenDef("pointer");
-
-  // Comparison operations
-  inline const auto Comp = TokenDef("comp");
-  inline const auto EQ = TokenDef("eq");
-  inline const auto NE = TokenDef("ne");
-  // Unsigned
-  inline const auto UGT = TokenDef("ugt");
-  inline const auto UGE = TokenDef("uge");
-  inline const auto ULT = TokenDef("ult");
-  inline const auto ULE = TokenDef("ule");
-  // Signed
-  inline const auto SGT = TokenDef("sgt");
-  inline const auto SGE = TokenDef("sge");
-  inline const auto SLT = TokenDef("slt");
-  inline const auto SLE = TokenDef("sle");
-
-  // Helpers
-  inline const auto PredecessorList = TokenDef("predecessor");
-  inline const auto Predecessor = TokenDef("prev");
-  inline const auto Global = TokenDef("global", flag::print);
-  inline const auto IRValue = TokenDef("value", flag::print);
-  inline const auto Src = TokenDef("src");
-  inline const auto Dst = TokenDef("dst");
-  inline const auto Result = TokenDef("result");
   inline const auto PropagateCompile = TokenDef("propagate_compile");
-  inline const auto ArgList = TokenDef("argument_list");
-  inline const auto OffsetList = TokenDef("offset_list");
-  inline const auto Offset = TokenDef("offset");
-
+ 
   // Closure implementation
-  inline const auto FreeVarList = TokenDef("free_var_list");
-  inline const auto FreeVar = TokenDef("free_variable");
+  inline const auto IRProgram = TokenDef("ir_program");
+  inline const auto IRFun = TokenDef("ir_function", flag::print | flag::symtab);
   inline const auto Env = TokenDef("env", flag::print);
   inline const auto ParamList = TokenDef("param_list");
   inline const auto CreateClosure = TokenDef("create_closure", flag::print);
   inline const auto ClosureCall = TokenDef("closure_call");
   inline const auto FunCall = TokenDef("fun_call");
   inline const auto Body = TokenDef("body");
-  inline const auto IRTypeList = TokenDef("ir_type_list");
-  inline const auto IRProgram = TokenDef("ir_program");
+  inline const auto FreeVarList = TokenDef("free_var_list");
+  inline const auto FreeVar = TokenDef("free_variable");
+  inline const auto TPtr = TokenDef("pointer");
+  
+  inline const auto Global = TokenDef("global", flag::print);
 }

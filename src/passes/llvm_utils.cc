@@ -1,25 +1,10 @@
 #include "./llvm_utils.hh"
 
-#include "../miniml-lang.hh"
+#include "../llvm-lang.hh"
 
-namespace miniml {
+namespace llvmir {
   using namespace trieste;
   using namespace llvm;
-
-  Node getLLVMType(Node type) {
-    if (type == TInt) {
-      return Ti32;
-    } else if (type == TBool) {
-      return Ti1;
-    } else if (type == TypeArrow) {
-      // TODO: Not sure how to handle this yet, so just return it
-      return TPtr;
-    } else if (type == TPtr) {
-      return type;
-    } else {
-      return nullptr;
-    }
-  }
 
   llvm::Type* createLLVMType(std::shared_ptr<LLVMIRContext> ctx, Node type) {
     if (type == Ti1) {
@@ -35,18 +20,8 @@ namespace miniml {
     }
   }
 
-  Node pop_front(Node node) {
-    // FIXME: Hopefully there is a better way to pop first child.
-    // FIXME: Since children are stored in a vector, pop-ing from front is
-    // Oh(n).
-    if (node->empty()) {
-      return {};
-    }
-
-    // Keeps reference alive.
-    Node child = node->front()->clone();
-    node->erase(node->begin(), node->begin() + 1);
-
-    return child;
+  std::string node_val(Node node) {
+    std::string text(node->location().view());
+    return text;
   }
 }

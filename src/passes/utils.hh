@@ -57,4 +57,18 @@ namespace miniml {
 
   Node instantiate(Node ty);
 
+  /**
+   * Pops and returns the first child of a Node.
+   * @param node parent node to pop first child of.
+   * @return the first child node.
+   */
+  Node pop_front(Node type);
+
+  /**
+   * Converts a miniML type token to an LLVM IR type token.
+   * @param type The miniML type token to convert.
+   * @return The LLVM IR type token.
+   */
+  Node getLLVMType(Node type);
+
 }

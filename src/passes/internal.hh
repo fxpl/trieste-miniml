@@ -1,7 +1,8 @@
 #pragma once
-// clang-format off
+#include "../llvm-lang.hh"
 #include "../miniml-lang.hh"
 
+// clang-format off
 namespace miniml{
  using namespace trieste;
 
@@ -220,71 +221,18 @@ namespace miniml{
 
   namespace LLVMIRCompilation{
 
-    inline const auto wf_comparison = (EQ | NE | UGT | UGE | ULT | ULE | SGT | SGE | SLT | SLE);
-    inline const auto wf_llvm_types = (Ti1 | Ti32 | Ti64 | TPtr | TypeArrow); 
-
-    inline const auto wf =
-    (Top <<= Ident * IRProgram)
-    | (IRProgram <<= (Action | IRFun)++[1])
-    | (IRFun <<= TypeArrow * ParamList * Body)
-      | (TypeArrow <<= (Ty1 >>= wf_llvm_types) * (Ty2 >>= wf_llvm_types))
-      | (ParamList <<= Param++)
-        | (Param <<= Ident * (Type >>= wf_llvm_types))
-      | (Body <<= (Instr | Label | Action)++[1])
-    // Builder actions, which aren't LLVM IR instructions.
-    | (Action <<= (CreateConst | CreateStructType | CreateFunType | GetFunction | GetType | GetSizeOfType))
-      | (CreateConst <<= Ident * (Type >>= Ti64 | Ti32 | Ti1) * IRValue)
-      | (CreateStructType <<= Ident * IRTypeList)
-        | (IRTypeList <<= wf_llvm_types++)
-      | (CreateFunType <<= (Result >>= Ident) * (IRType >>= wf_llvm_types) * IRTypeList)
-        | (IRTypeList <<= wf_llvm_types++)
-      | (GetFunction <<= (Result >>= Ident) * (Fun >>= Ident))
-      | (GetType <<= (Result >>= Ident) * (IRType >>= Ident))
-      | (GetSizeOfType <<= (Result >>= Ident) * (Type >>= (Ti32 | Ti64)) * (IRType >>= Ident))
-    // LLVM IR instructions.
-    | (Instr <<= (BinaryOp | MemoryOp | TerminatorOp | MiscOp | ConversionOp))
-    | (BinaryOp <<= (Add | Sub | Mul))
-      | (Add <<= (Result >>= Ident) * (Type >>= Ti32) * (Lhs >>= Ident) * (Rhs >>= Ident))
-      | (Sub <<= (Result >>= Ident) * (Type >>= Ti32) * (Lhs >>= Ident) * (Rhs >>= Ident))
-      | (Mul <<= (Result >>= Ident) * (Type >>= Ti32) * (Lhs >>= Ident) * (Rhs >>= Ident))
-    | (MemoryOp <<= (Alloca | Load | Store | GetElementPtr))
-      | (Alloca <<= (Result >>= Ident) * (Type >>= wf_llvm_types))
-      | (Load <<= (Result >>= Ident) * (Type >>= wf_llvm_types) * (Src >>= Ident))
-      | (Store <<= (IRValue >>= Ident) * (Dst >>= Ident))
-      | (GetElementPtr <<= (Result >>= Ident) * (IRType >>= Ident) * (IRValue >>= Ident) * OffsetList)
-        | (OffsetList <<= Offset++)
-          | (Offset <<= (IRType >>= wf_llvm_types) * IRValue)
-    | (MiscOp <<= (Call | CallOpaque | Icmp | Phi))
-      | (Call <<= ((Result >>= Ident) * (Fun >>= Ident) * ArgList))
-      | (CallOpaque <<= ((Result >>= Ident) * (IRType >>= Ident) * (Fun >>= Ident) * ArgList))
-        | (ArgList <<= (Ident)++)
-      | (Icmp <<= (Result >>= Ident) * (Op >>= wf_comparison) * (Type >>= (Ti1 | Ti32)) * (Lhs >>= Ident) * (Rhs >>= Ident))
-      | (Phi <<= (Result >>= Ident) * (Type >>= wf_llvm_types) * PredecessorList)
-        | (PredecessorList <<= Predecessor++)
-          | (Predecessor <<= (IRValue >>= Ident) * Label)
-    | (TerminatorOp <<= (Branch | Jump | Ret))
-      | (Branch <<= (Cond >>= Ident) * (True >>= Label) * (False >>= Label))
-      | (Jump <<= (Label))
-      | (Ret <<= Ident)
-    | (ConversionOp <<= (BitCast))
-      | (BitCast <<= (Result >>= Ident) * (IRValue >>= Ident) * (IRType >>= (Ident | wf_llvm_types)))
+    inline const auto wf = 
+    llvmir::wf - llvmir::Block
+    | (llvmir::Body <<= (llvmir::Instr | llvmir::Label | llvmir::Action)++[1])
     ;
   }
 
   namespace LLVMIRBlockify {
 
     inline const auto wf = LLVMIRCompilation::wf
-    | (Body <<= (Block)++[1])
-    | (Block <<= (Instr | Label | FunDef | Action)++[1])
+    | (llvmir::Body <<= (llvmir::Block)++[1])
+    | (llvmir::Block <<= (llvmir::Label | llvmir::Instr | llvmir::Action)++[1])
     ;
   }
-
-  namespace LLVMIRGeneration {
-
-  inline const auto wf =
-    LLVMIRBlockify::wf
-    ;
-      
-    }
 }
 // clang-format on

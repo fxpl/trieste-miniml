@@ -31,44 +31,29 @@ namespace miniml {
     return {
       "blockify",
       miniml::LLVMIRBlockify::wf,
-      (dir::topdown),
+      (dir::topdown | dir::once),
       {
-        /**
-         * Initialize compile cursor for blockify pass.
-         */
         In(llvmir::IRFun) *
-            (T(llvmir::Body)[Body] << (Start * !T(llvmir::Block, Compile))) >>
+            (T(llvmir::Body)[Body] << (Start * !T(llvmir::Block))) >>
           [](Match& _) -> Node {
-          auto children = *_(Body);
+          Node blockifiedBody = llvmir::Body;
 
-          return llvmir::Body << (Compile << children);
+          Node currentBlock = nullptr;
+          for (Node child : *_(Body)) {
+            if (child == llvmir::Label) {
+              currentBlock = llvmir::Block ^ node_val(child);
+              currentBlock->push_back(child);
+            } else if (child->front() == llvmir::TerminatorOp) {
+              currentBlock->push_back(child);
+              blockifiedBody->push_back(currentBlock);
+              currentBlock = nullptr;
+            } else {
+              currentBlock->push_back(child);
+            }
+          }
+
+          return blockifiedBody;
         },
-
-        /**
-         * Create new block in current function.
-         */
-        T(Compile)[Compile] << Start * T(llvmir::Label)[llvmir::Label] >>
-          [](Match& _) -> Node {
-          Node block = llvmir::Block ^ node_val(_(llvmir::Label));
-          Node label = pop_front(_(Compile));
-
-          return Lift << llvmir::Body << (block << label << _(Compile));
-        },
-
-        /**
-         * Add instruction to current block.
-         */
-        T(Compile)[Compile] << Start * !T(llvmir::Label) >>
-          [](Match& _) -> Node {
-          Node node = pop_front(_(Compile));
-
-          return Seq << (Lift << llvmir::Block << node) << _(Compile);
-        },
-
-        /**
-         * Blockification completed
-         */
-        T(Compile) << Start * End >> [](Match& _) -> Node { return {}; },
       }};
   }
 }

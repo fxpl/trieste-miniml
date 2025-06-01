@@ -24,7 +24,6 @@
 #include "llvm-ir/closure_globals.cc"
 #include "llvm-ir/compile.cc"
 #include "llvm-ir/blockify.cc"
-#include "llvm-ir/reverse_blocks.cc"
 #include "llvm-ir/code_generation.cc"
 // clang-format on
 
@@ -68,9 +67,8 @@ namespace miniml {
       // Compile to LLVM IR WF
       compile(),
       blockify(),
-      llvmir::reverse_blocks(),
 
-      // Code generation
+      // // Code generation
       llvmir::code_generation(),
     };
   }

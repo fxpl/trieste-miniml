@@ -1,6 +1,6 @@
+#include "../../llvm-lang.hh"
 #include "../../miniml-lang.hh"
 #include "../internal.hh"
-#include "../llvm_utils.hh"
 #include "../utils.hh"
 #include "trieste/token.h"
 
@@ -37,22 +37,19 @@ namespace miniml {
          * Add compile node and assign tmp/register.
          */
         In(Top) * Start * T(IRProgram)[Program] * End >> [](Match& _) -> Node {
-          Node result = Ident ^ _(Program)->fresh();
-
-          return (Compile << result << _(Program));
+          return (Compile << (llvmir::Program << *_(Program)));
         },
 
         /**
          * Compile program and add compile nodes to its children.
          */
-        T(Compile) << T(Ident)[Ident] * T(IRProgram)[Program] >>
-          [](Match& _) -> Node {
+        T(Compile) << T(llvmir::Program)[Program] >> [](Match& _) -> Node {
           Node prog = _(Program);
 
           for (size_t i = 0; i < prog->size(); i++) {
             Node topexpr = prog->at(i);
             if (topexpr == TopExpr || topexpr == Expr) {
-              Node ident = Ident ^ prog->fresh();
+              Node ident = llvmir::Ident ^ prog->fresh();
               prog->replace_at(i, Compile << ident << topexpr);
             } else {
               prog->replace_at(i, Compile << topexpr);
@@ -62,19 +59,20 @@ namespace miniml {
           auto topExpressions = *_(Program);
           prog->erase(prog->begin(), prog->end());
 
-          return Seq << _(Ident)->clone() << (prog << topExpressions);
+          return Seq << (prog << topExpressions);
         },
 
         /**
          * Compile TopExpression.
          */
-        T(Compile) << T(Ident)[Result] * (T(TopExpr) << T(Expr, Let)[Expr]) >>
+        T(Compile) << T(llvmir::Ident)[Result] *
+              (T(TopExpr) << T(Expr, Let)[Expr]) >>
           [](Match& _) -> Node { return (Compile << _(Result) << _(Expr)); },
 
         /**
          * Let
          */
-        T(Compile) << T(Ident)[Result] * T(Let)[Let] >>
+        T(Compile) << T(llvmir::Ident)[Result] * T(Let)[Let] >>
           [context](Match& _) -> Node {
           // TODO: Need to deal with ForAllTy. Until I figure out how, just
           // pretend it cannot be nested and ignore it.
@@ -88,111 +86,121 @@ namespace miniml {
             return err(_(Type), "let type not supported");
           }
 
-          return Seq << (Instr << (MemoryOp << (Alloca << ident << llvmType)))
+          Node irIdent = llvmir::Ident ^ node_val(ident);
+
+          return Seq << (llvmir::Instr
+                         << (llvmir::MemoryOp
+                             << (llvmir::Alloca << irIdent << llvmType)))
                      << (Compile << _(Result) << expr)
-                     << (Instr
-                         << (MemoryOp
-                             << (Store << _(Result)->clone()
-                                       << ident->clone())));
+                     << (llvmir::Instr
+                         << (llvmir::MemoryOp
+                             << (llvmir::Store << _(Result)->clone()
+                                               << irIdent->clone())));
         },
 
         /**
          * Boolean
          */
-        T(Compile) << T(Ident)[Result] *
+        T(Compile) << T(llvmir::Ident)[Result] *
               (T(Expr) << (T(Type) << T(TBool)[Type]) *
-                 T(True, False)[IRValue]) >>
+                 T(True, False)[TBool]) >>
           [](Match& _) -> Node {
+          Node irValue = _(TBool);
           Node value = NULL;
-          if (_(IRValue) == True) {
-            value = IRValue ^ "1";
-          } else if (_(IRValue) == False) {
-            value = IRValue ^ "0";
+          if (irValue == True) {
+            value = llvmir::IRValue ^ "1";
+          } else if (irValue == False) {
+            value = llvmir::IRValue ^ "0";
           }
           assert(value);
 
           Node llvmType = getLLVMType(_(Type));
           assert(llvmType);
 
-          return Action << (CreateConst << _(Result) << llvmType << value);
+          return llvmir::Action
+            << (llvmir::CreateConst << _(Result) << llvmType << value);
         },
 
         /**
          * Integer
          */
-        T(Compile) << T(Ident)[Result] *
+        T(Compile) << T(llvmir::Ident)[Result] *
               (T(Expr) << (T(Type) << T(TInt)[Type]) * T(Int)[Int]) >>
           [](Match& _) -> Node {
-          Node value = IRValue ^ node_val(_(Int));
+          Node value = llvmir::IRValue ^ node_val(_(Int));
 
           Node llvmType = getLLVMType(_(Type));
           assert(llvmType);
 
-          return Action << (CreateConst << _(Result) << llvmType << value);
+          return llvmir::Action
+            << (llvmir::CreateConst << _(Result) << llvmType << value);
         },
 
         /**
          * Identifier
          */
         T(Compile)
-            << (T(Ident)[Result] *
+            << (T(llvmir::Ident)[Result] *
                 (T(Expr) << (T(Type)[Type] * T(Ident)[Ident]))) >>
           [context](Match& _) -> Node {
           auto llvmType = getLLVMType(_(Type) / Type);
           assert(llvmType);
 
-          return Instr
-            << (ConversionOp << (BitCast << _(Result) << _(Ident) << llvmType));
+          Node irIdent = llvmir::Ident ^ node_val(_(Ident));
+
+          return llvmir::Instr
+            << (llvmir::ConversionOp
+                << (llvmir::BitCast << _(Result) << irIdent << llvmType));
         },
 
         /**
          * Global
          */
         T(Compile)
-            << (T(Ident)[Result] *
+            << (T(llvmir::Ident)[Result] *
                 (T(Expr) << (T(Type)[Type] * T(Global)[Global]))) >>
           [context](Match& _) -> Node {
           auto llvmType = getLLVMType(_(Type) / Type);
           assert(llvmType);
 
-          return Instr
-            << (MemoryOp
-                << (Load << _(Result) << llvmType
-                         << (Ident ^ node_val(_(Global)))));
+          return llvmir::Instr
+            << (llvmir::MemoryOp
+                << (llvmir::Load << _(Result) << llvmType
+                                 << (llvmir::Ident ^ node_val(_(Global)))));
         },
 
         /**
          * Binary operation.
          */
-        T(Compile) << T(Ident)[Result] *
-              (T(Expr) << T(Type)[Type] * T(Add, Sub, Mul)[BinaryOp]) >>
+        T(Compile) << T(llvmir::Ident)[Result] *
+              (T(Expr) << T(Type)[Type] * T(Add, Sub, Mul)[Op]) >>
           [](Match& _) -> Node {
           Node resultId = _(Result);
-          Node binop = _(BinaryOp);
+          Node binop = _(Op);
           Node lhs = binop / Lhs;
           Node rhs = binop / Rhs;
 
           Node op = NULL;
           if (binop == Add) {
-            op = Add;
+            op = llvmir::Add;
           } else if (binop == Sub) {
-            op = Sub;
+            op = llvmir::Sub;
           } else if (binop == Mul) {
-            op = Mul;
+            op = llvmir::Mul;
           }
           assert(op);
 
           Node llvmType = getLLVMType(_(Type) / Type);
           assert(llvmType);
 
-          Node lhsId = Ident ^ lhs->fresh();
-          Node rhsId = Ident ^ rhs->fresh();
+          Node lhsId = llvmir::Ident ^ lhs->fresh();
+          Node rhsId = llvmir::Ident ^ rhs->fresh();
 
           // Instruction
           return Seq << (Compile << lhsId->clone() << lhs)
                      << (Compile << rhsId->clone() << rhs)
-                     << (Instr
-                         << (BinaryOp
+                     << (llvmir::Instr
+                         << (llvmir::BinaryOp
                              << (op << resultId << llvmType << lhsId
                                     << rhsId)));
         },
@@ -200,7 +208,7 @@ namespace miniml {
         /**
          * Comparison
          */
-        T(Compile) << T(Ident)[Result] *
+        T(Compile) << T(llvmir::Ident)[Result] *
               (T(Expr) << T(Type) * T(Equals, LT)[Op]) >>
           [](Match& _) -> Node {
           Node comparison = _(Op);
@@ -219,28 +227,28 @@ namespace miniml {
 
           Node op = NULL;
           if (comparison == Equals) {
-            op = EQ;
+            op = llvmir::EQ;
           } else if (comparison == LT) {
-            op = SLT;
+            op = llvmir::SLT;
           } else {
             return err(comparison, "comparison operator not supported");
           }
 
-          Node lhsIdent = Ident ^ lhs->fresh();
-          Node rhsIdent = Ident ^ rhs->fresh();
+          Node lhsIdent = llvmir::Ident ^ lhs->fresh();
+          Node rhsIdent = llvmir::Ident ^ rhs->fresh();
 
           return Seq << (Compile << lhsIdent->clone() << lhs)
                      << (Compile << rhsIdent->clone() << rhs)
-                     << (Instr
-                         << (MiscOp
-                             << (Icmp << _(Result) << op << llvmType << lhsIdent
-                                      << rhsIdent)));
+                     << (llvmir::Instr
+                         << (llvmir::MiscOp
+                             << (llvmir::Icmp << _(Result) << op << llvmType
+                                              << lhsIdent << rhsIdent)));
         },
 
         /**
          * If-then-else
          */
-        T(Compile) << T(Ident)[Ident] *
+        T(Compile) << T(llvmir::Ident)[Result] *
               (T(Expr)[Expr] << T(Type) *
                  (T(If) << T(Expr)[Cond] * T(Expr)[True] * T(Expr)[False])) >>
           [](Match& _) -> Node {
@@ -251,85 +259,84 @@ namespace miniml {
           }
           assert(llvmType);
 
-          Node condId = Ident ^ _(Cond)->fresh();
-          Node ifTrueId = Ident ^ _(True)->fresh();
-          Node ifFalseId = Ident ^ _(False)->fresh();
+          Node condId = llvmir::Ident ^ _(Cond)->fresh();
+          Node ifTrueId = llvmir::Ident ^ _(True)->fresh();
+          Node ifFalseId = llvmir::Ident ^ _(False)->fresh();
 
           std::string ifId = node_val(condId);
-          Node thenLabel = Label ^ ("then" + ifId);
-          Node thenEndLabel = Label ^ ("thenEnd" + ifId);
-          Node elseLabel = Label ^ ("else" + ifId);
-          Node elseEndLabel = Label ^ ("elseEnd" + ifId);
-          Node ifEndLabel = Label ^ ("ifEnd" + ifId);
+          Node thenLabel = llvmir::Label ^ ("then" + ifId);
+          Node thenEndLabel = llvmir::Label ^ ("thenEnd" + ifId);
+          Node elseLabel = llvmir::Label ^ ("else" + ifId);
+          Node elseEndLabel = llvmir::Label ^ ("elseEnd" + ifId);
+          Node ifEndLabel = llvmir::Label ^ ("ifEnd" + ifId);
 
           // clang-format off
           return Seq
             << (Compile << condId << _(Cond))
-            // If
-            << (Instr
-                << (TerminatorOp
-                    << (Branch << condId->clone() 
-                               << thenLabel->clone()
-                               << elseLabel->clone())))
-            // Then
-            << (thenLabel) 
+            << (llvmir::Instr
+                << (llvmir::TerminatorOp
+                    << (llvmir::Branch
+                        << condId->clone()
+                        << thenLabel->clone()
+                        << elseLabel->clone())))
+            << (thenLabel)
             << (Compile << ifTrueId->clone() << _(True))
-            << (Instr 
-                << (TerminatorOp 
-                    << (Jump << thenEndLabel->clone())))
+            << (llvmir::Instr
+                << (llvmir::TerminatorOp
+                    << (llvmir::Jump << thenEndLabel->clone())))
             // "Landing" block so Phi unaffected by branching in Then/Else expr.
             << (thenEndLabel)
-            << (Instr 
-                << (TerminatorOp 
-                    << (Jump << ifEndLabel->clone())))
-            // Else
-            << (elseLabel) 
+            << (llvmir::Instr
+                << (llvmir::TerminatorOp
+                    << (llvmir::Jump << ifEndLabel->clone())))
+            << (elseLabel)
             << (Compile << ifFalseId->clone() << _(False))
-            << (Instr 
-                << (TerminatorOp 
-                    << (Jump << elseEndLabel->clone())))
+            << (llvmir::Instr
+                << (llvmir::TerminatorOp
+                    << (llvmir::Jump << elseEndLabel->clone())))
             // "Landing" block so Phi unaffected by branching in Then/Else expr.
             << (elseEndLabel)
-            << (Instr 
-                << (TerminatorOp 
-                    << (Jump << ifEndLabel->clone())))
-            // ifEnd
+            << (llvmir::Instr
+                << (llvmir::TerminatorOp
+                    << (llvmir::Jump << ifEndLabel->clone())))
             << (ifEndLabel)
-            << (Instr
-                << (MiscOp
-                    << (Phi
-                        << _(Ident) << llvmType
-                        << (PredecessorList
-                            << (Predecessor << ifTrueId << thenEndLabel->clone())
-                            << (Predecessor << ifFalseId << elseEndLabel->clone())))));
+            << (llvmir::Instr
+                << (llvmir::MiscOp
+                    << (llvmir::Phi
+                        << _(Result)
+                        << llvmType
+                        << (llvmir::PredecessorList
+                            << (llvmir::Predecessor << ifTrueId << thenEndLabel->clone())
+                            << (llvmir::Predecessor << ifFalseId << elseEndLabel->clone())))));
           // clang-format on
         },
 
         /**
          * Function Call
          */
-        T(Compile) << T(Ident)[Result] *
+        T(Compile) << T(llvmir::Ident)[Result] *
               (T(Expr) << T(Type) * T(FunCall)[FunCall]) >>
           [](Match& _) -> Node {
           Node funcall = _(FunCall);
           Node fun = funcall / Fun;
           Node param = funcall / Param;
 
-          Node argIdent = Ident ^ param->fresh();
-          Node funIdent = Ident ^ fun->fresh();
+          Node argIdent = llvmir::Ident ^ param->fresh();
+          Node funIdent = llvmir::Ident ^ fun->fresh();
 
           return Seq << (Compile << argIdent->clone() << param)
                      << (Compile << funIdent->clone() << fun)
-                     << (Instr
-                         << (MiscOp
-                             << (Call << _(Result) << funIdent
-                                      << (ArgList << argIdent))));
+                     << (llvmir::Instr
+                         << (llvmir::MiscOp
+                             << (llvmir::Call
+                                 << _(Result) << funIdent
+                                 << (llvmir::ArgList << argIdent))));
         },
 
         /**
          * Closure Call
          */
-        T(Compile) << T(Ident)[Result] *
+        T(Compile) << T(llvmir::Ident)[Result] *
               (T(Expr) << (T(Type)) * T(ClosureCall)[ClosureCall]) >>
           [](Match& _) -> Node {
           Node closCall = _(ClosureCall);
@@ -345,51 +352,60 @@ namespace miniml {
           assert(retLLVMType);
 
           std::string uniqueId = std::string(fun->fresh().view());
-          Node closurePtr = Ident ^ "closPtr_" + uniqueId;
-          Node closureTy = Ident ^ "ClosureTy";
-          Node funSlotPtr = Ident ^ "funSlot_" + uniqueId;
-          Node funPtr = Ident ^ "funPtr_" + uniqueId;
-          Node funTy = Ident ^ "funType_" + uniqueId;
-          Node envSlotPtr = Ident ^ "envSlot_" + uniqueId;
-          Node envPtr = Ident ^ "envPtr_" + uniqueId;
-          Node argId = Ident ^ param->fresh();
-          Node funId = Ident ^ param->fresh();
+          Node closurePtr = llvmir::Ident ^ "closPtr_" + uniqueId;
+          Node closureTy = llvmir::Ident ^ "ClosureTy";
+          Node funSlotPtr = llvmir::Ident ^ "funSlot_" + uniqueId;
+          Node funPtr = llvmir::Ident ^ "funPtr_" + uniqueId;
+          Node funTy = llvmir::Ident ^ "funType_" + uniqueId;
+          Node envSlotPtr = llvmir::Ident ^ "envSlot_" + uniqueId;
+          Node envPtr = llvmir::Ident ^ "envPtr_" + uniqueId;
+          Node argId = llvmir::Ident ^ param->fresh();
+          Node funId = llvmir::Ident ^ param->fresh();
 
           // clang-format off
-          Node GEPEnvSlotInClosure = (Instr
-              << (MemoryOp
-                  << (GetElementPtr
-                      << envSlotPtr 
-                      << closureTy 
-                      << closurePtr->clone()
-                      << (OffsetList
-                          << (Offset << Ti32 << (IRValue ^ "0"))
-                          << (Offset << Ti32 << (IRValue ^ "0"))))));
-          Node loadEnvPtr = (Instr
-              << (MemoryOp
-                  << (Load << envPtr << TPtr << envSlotPtr->clone())));
-          Node GEPFunSlotInClosure = (Instr
-              << (MemoryOp
-                  << (GetElementPtr
-                      << funSlotPtr 
-                      << closureTy->clone()
-                      << closurePtr->clone()
-                      << (OffsetList
-                          << (Offset << Ti32 << (IRValue ^ "0"))
-                          << (Offset << Ti32 << (IRValue ^ "1"))))));
-          Node loadFunPtr = (Instr
-              << (MemoryOp
-                  << (Load << funPtr << TPtr << funSlotPtr->clone())));
-          Node createFunType = (Action
-              << (CreateFunType
-                  << funTy << retLLVMType
-                  << (IRTypeList << TPtr << TPtr << argLLVMType)));
-          Node callFun = (Instr
-              << (MiscOp
-                  << (CallOpaque
-                      << _(Result) << funTy->clone() << funPtr->clone()
-                      << (ArgList << closurePtr->clone() << envPtr->clone()
-                                  << argId->clone()))));
+          Node GEPEnvSlotInClosure =
+            (llvmir::Instr
+             << (llvmir::MemoryOp
+                 << (llvmir::GetElementPtr
+                     << envSlotPtr
+                     << closureTy
+                     << closurePtr->clone()
+                     << (llvmir::OffsetList
+                         << (llvmir::Offset << llvmir::Ti32 << (llvmir::IRValue ^ "0"))
+                         << (llvmir::Offset << llvmir::Ti32 << (llvmir::IRValue ^ "0"))))));
+          Node loadEnvPtr =
+            (llvmir::Instr
+             << (llvmir::MemoryOp
+                 << (llvmir::Load << envPtr << llvmir::TPtr << envSlotPtr->clone())));
+          Node GEPFunSlotInClosure =
+            (llvmir::Instr
+             << (llvmir::MemoryOp
+                 << (llvmir::GetElementPtr
+                     << funSlotPtr
+                     << closureTy->clone()
+                     << closurePtr->clone()
+                     << (llvmir::OffsetList
+                         << (llvmir::Offset << llvmir::Ti32 << (llvmir::IRValue ^ "0"))
+                         << (llvmir::Offset << llvmir::Ti32 << (llvmir::IRValue ^ "1"))))));
+          Node loadFunPtr =
+            (llvmir::Instr
+             << (llvmir::MemoryOp
+                 << (llvmir::Load << funPtr << llvmir::TPtr << funSlotPtr->clone())));
+          Node createFunType =
+            (llvmir::Action
+             << (llvmir::CreateFunType
+                 << funTy
+                 << retLLVMType
+                 << (llvmir::TypeList << llvmir::TPtr << llvmir::TPtr << argLLVMType)));
+          Node callFun =
+            (llvmir::Instr
+             << (llvmir::MiscOp
+                 << (llvmir::CallOpaque
+                     << _(Result) << funTy->clone() << funPtr->clone()
+                     << (llvmir::ArgList
+                         << closurePtr->clone()
+                         << envPtr->clone()
+                         << argId->clone()))));
 
           return Seq
             << (Compile << closurePtr << fun)
@@ -406,7 +422,7 @@ namespace miniml {
         /**
          * Print
          */
-        T(Compile) << T(Ident)[Ident] *
+        T(Compile) << T(llvmir::Ident)[Result] *
               (T(Expr) << (T(Type) << T(TypeArrow)[TypeArrow]) * T(Print)) >>
           [](Match& _) -> Node {
           Node funcName = NULL;
@@ -415,17 +431,18 @@ namespace miniml {
           }
 
           if ((_(TypeArrow) / Ty1 == TInt) && (_(TypeArrow) / Ty2 == TInt)) {
-            funcName = Ident ^ "native$printInt";
+            funcName = llvmir::Ident ^ "native$printInt";
           } else if (
             (_(TypeArrow) / Ty1 == TBool) && (_(TypeArrow) / Ty2 == TBool)) {
-            funcName = Ident ^ "native$printBool";
+            funcName = llvmir::Ident ^ "native$printBool";
           }
 
           if (!funcName) {
             return err(_(TypeArrow), "print function with this type not found");
           }
 
-          return (Action << (GetFunction << _(Ident) << funcName));
+          return (
+            llvmir::Action << (llvmir::GetFunction << _(Result) << funcName));
         },
 
         /**
@@ -444,47 +461,50 @@ namespace miniml {
           Node returnType = getLLVMType(type / Ty2);
           assert(returnType);
 
-          Node funType = TypeArrow << paramType << returnType;
+          Node funType = llvmir::TypeArrow << paramType << returnType;
 
           std::string uniqueId = std::string(fun->fresh().view());
-          Node entryPoint = Label ^ ("entry_" + uniqueId);
-          Node returnId = Ident ^ ("ret_" + uniqueId);
+          Node entryPoint = llvmir::Label ^ ("entry_" + uniqueId);
+          Node returnId = llvmir::Ident ^ ("ret_" + uniqueId);
 
-          Node irfun = IRFun ^ node_val(fun);
+          Node irfun = llvmir::IRFun ^ node_val(fun);
           Node returnInstr =
-            (Instr << (TerminatorOp << (Ret << returnId->clone())));
+            (llvmir::Instr
+             << (llvmir::TerminatorOp << (llvmir::Ret << returnId->clone())));
 
           if ("main" == node_val(fun)) {
             // clang-format off
             return Seq
               << (irfun
-                << funType
-                << (Compile << paramList)
-                << (Body
-                    << entryPoint
-                    // main() may contain multiple expressions.
-                    << (Compile << (PropagateCompile << *body))
-                    // main() expected to return 0 for program success.
-                    << (Action
-                        << (CreateConst << returnId->clone() << Ti32
-                                        << (IRValue ^ "0")))
-                    << returnInstr));
+                  << funType
+                  << (Compile << paramList)
+                  << (llvmir::Body
+                      << entryPoint
+                      // main() may contain multiple expressions.
+                      << (Compile << (PropagateCompile << *body))
+                      // main() expected to return 0 for program success.
+                      << (llvmir::Action
+                          << (llvmir::CreateConst
+                              << returnId->clone()
+                              << llvmir::Ti32
+                              << (llvmir::IRValue ^ "0")))
+                      << returnInstr));
             // clang-format on
           } else {
             Node env = fun / Env;
 
-            Node envType = Ident ^ node_val(env);
-            Node envPtr = (paramList->at(1) / Ident)->clone();
+            Node envType = llvmir::Ident ^ node_val(env);
+            Node envPtr = llvmir::Ident ^ node_val((paramList->at(1) / Ident));
             Node loadFreeVarsFromEnv =
               (Compile << envType->clone() << envPtr->clone() << freeVarList
-                       << Load);
+                       << llvmir::Load);
 
             // clang-format off
             return Seq
               << (irfun
                   << funType
                   << (Compile << paramList)
-                  << (Body
+                  << (llvmir::Body
                       << entryPoint
                       << loadFreeVarsFromEnv
                       << (Compile << returnId << *body)
@@ -508,92 +528,106 @@ namespace miniml {
             env->replace_at(i, (Compile << type));
           }
 
-          Node name = Ident ^ node_val(env);
+          Node name = llvmir::Ident ^ node_val(env);
           auto typesToCompile = *env;
 
-          return Action
-            << (CreateStructType << name << (IRTypeList << typesToCompile));
+          return llvmir::Action
+            << (llvmir::CreateStructType
+                << name << (llvmir::TypeList << typesToCompile));
         },
 
         /**
          * Create Closure
          */
         T(Compile)
-            << (T(Ident)[Result] *
+            << (T(llvmir::Ident)[Result] *
                 (T(Expr) << (T(Type) * (T(CreateClosure)[CreateClosure])))) >>
           [](Match& _) -> Node {
           Node createClosure = _(CreateClosure);
           Node fun = createClosure / Fun;
+          Node irFun = llvmir::Ident ^ node_val(fun);
           Node freeVarList = createClosure / FreeVarList;
 
-          Node allocatorFun = Ident ^ "malloc";
+          Node allocatorFun = llvmir::Ident ^ "malloc";
 
-          Node closureBytes = Ident ^ createClosure->fresh();
+          Node closureBytes = llvmir::Ident ^ createClosure->fresh();
           Node closurePtr = _(Result);
-          Node closureTy = Ident ^ "ClosureTy";
+          Node closureTy = llvmir::Ident ^ "ClosureTy";
 
           std::string uniqueId = std::string(createClosure->fresh().view());
 
-          Node envSlotPtr = Ident ^ "envSlot_" + uniqueId;
-          Node envPtr = Ident ^ "envPtr_" + uniqueId;
+          Node envSlotPtr = llvmir::Ident ^ "envSlot_" + uniqueId;
+          Node envPtr = llvmir::Ident ^ "envPtr_" + uniqueId;
 
-          Node funSlotPtr = Ident ^ "funSlot_" + uniqueId;
-          Node funPtr = Ident ^ "funPtr_" + uniqueId;
+          Node funSlotPtr = llvmir::Ident ^ "funSlot_" + uniqueId;
+          Node funPtr = llvmir::Ident ^ "funPtr_" + uniqueId;
 
           // clang-format off
           Node getClosureSize =
-            (Action << (GetSizeOfType << closureBytes << Ti64 << closureTy));
+            (llvmir::Action
+             << (llvmir::GetSizeOfType
+                 << closureBytes << llvmir::Ti64 << closureTy));
           Node allocateClosure =
-            (Instr
-             << (MiscOp
-                 << (Call << closurePtr
-                          << allocatorFun->clone()
-                          << (ArgList << closureBytes->clone()))));
+            (llvmir::Instr
+             << (llvmir::MiscOp
+                 << (llvmir::Call
+                     << closurePtr
+                     << allocatorFun->clone()
+                     << (llvmir::ArgList << closureBytes->clone()))));
           Node GEPFunSlotInClosure =
-            (Instr
-             << (MemoryOp
-                 << (GetElementPtr
-                     << funSlotPtr << closureTy->clone() << closurePtr->clone()
-                     << (OffsetList << (Offset << Ti32 << (IRValue ^ "0"))
-                                    << (Offset << Ti32 << (IRValue ^ "1"))))));
-          Node getFunPtr = (Action << (GetFunction << funPtr << fun));
+            (llvmir::Instr
+             << (llvmir::MemoryOp
+                 << (llvmir::GetElementPtr
+                     << funSlotPtr
+                     << closureTy->clone()
+                     << closurePtr->clone()
+                     << (llvmir::OffsetList
+                         << (llvmir::Offset << llvmir::Ti32 << (llvmir::IRValue ^ "0"))
+                         << (llvmir::Offset << llvmir::Ti32 << (llvmir::IRValue ^ "1"))))));
+          Node getFunPtr =
+            (llvmir::Action
+             << (llvmir::GetFunction << funPtr << irFun));
           Node storeFunPtrInClosure =
-            (Instr
-             << (MemoryOp
-                 << (Store << funPtr->clone() << funSlotPtr->clone())));
+            (llvmir::Instr
+             << (llvmir::MemoryOp
+                 << (llvmir::Store << funPtr->clone() << funSlotPtr->clone())));
           // clang-format on
 
           if (freeVarList->size() > 0) {
             Node env = createClosure / Env;
 
-            Node envBytes = Ident ^ createClosure->fresh();
-            Node envTy = Ident ^ node_val(env);
+            Node envBytes = llvmir::Ident ^ createClosure->fresh();
+            Node envTy = llvmir::Ident ^ node_val(env);
 
             // clang-format off
             Node getEnvSize =
-              (Action << (GetSizeOfType << envBytes << Ti64 << envTy));
+              (llvmir::Action
+               << (llvmir::GetSizeOfType
+                   << envBytes << llvmir::Ti64 << envTy));
             Node allocateEnv =
-              (Instr
-               << (MiscOp
-                   << (Call << envPtr
-                            << allocatorFun
-                            << (ArgList << envBytes->clone()))));
+              (llvmir::Instr
+               << (llvmir::MiscOp
+                   << (llvmir::Call
+                       << envPtr
+                       << allocatorFun
+                       << (llvmir::ArgList << envBytes->clone()))));
             Node storeFreeVarsInEnv =
               (Compile
-                << envTy->clone() << envPtr->clone() << freeVarList << Store);
+               << envTy->clone() << envPtr->clone() << freeVarList << llvmir::Store);
             Node GEPEnvSlotInClosure =
-              (Instr
-                << (MemoryOp
-                    << (GetElementPtr
-                        << envSlotPtr
-                        << closureTy->clone()
-                        << closurePtr->clone()
-                        << (OffsetList << (Offset << Ti32 << (IRValue ^ "0"))
-                                       << (Offset << Ti32 << (IRValue ^ "0"))))));
+              (llvmir::Instr
+               << (llvmir::MemoryOp
+                   << (llvmir::GetElementPtr
+                       << envSlotPtr
+                       << closureTy->clone()
+                       << closurePtr->clone()
+                       << (llvmir::OffsetList
+                           << (llvmir::Offset << llvmir::Ti32 << (llvmir::IRValue ^ "0"))
+                           << (llvmir::Offset << llvmir::Ti32 << (llvmir::IRValue ^ "0"))))));
             Node storeEnvPtrInClosure =
-              (Instr
-              << (MemoryOp
-                  << (Store << envPtr->clone() << envSlotPtr->clone())));
+              (llvmir::Instr
+               << (llvmir::MemoryOp
+                   << (llvmir::Store << envPtr->clone() << envSlotPtr->clone())));
 
             return Seq << getClosureSize
                        << allocateClosure
@@ -639,7 +673,7 @@ namespace miniml {
             paramList->replace_at(i, (Compile << param));
           }
 
-          return paramList;
+          return (llvmir::ParamList << *paramList);
         },
 
         /**
@@ -648,19 +682,20 @@ namespace miniml {
         T(Compile) << T(Param)[Param] >> [](Match& _) -> Node {
           Node param = _(Param);
           Node ident = param / Ident;
-          Node type = get_type(param);
+          Node irIdent = llvmir::Ident ^ node_val(ident);
 
+          Node type = get_type(param);
           Node llvmType = getLLVMType(type);
           assert(llvmType);
 
-          return Param << ident << llvmType;
+          return llvmir::Param << irIdent << llvmType;
         },
 
         /**
          * FreeVarList (Populate environment)
          */
-        T(Compile) << T(Ident)[Env] * T(Ident)[TPtr] *
-              T(FreeVarList)[FreeVarList] * T(Store) >>
+        T(Compile) << T(llvmir::Ident)[Env] * T(llvmir::Ident)[TPtr] *
+              T(FreeVarList)[FreeVarList] * T(llvmir::Store) >>
           [](Match& _) -> Node {
           Node envPtr = _(TPtr);
           Node envTy = _(Env);
@@ -670,45 +705,44 @@ namespace miniml {
           for (size_t i = 0; i < freeVarList->size(); i++) {
             Node freeVar = freeVarList->at(i);
             Node ident = freeVar / Ident;
+            Node irIdent = llvmir::Ident ^ node_val(ident);
             Node type = getLLVMType(get_type(freeVar));
 
-            Node tmp = Ident ^ freeVarList->fresh();
-            Node freeVarSlot = Ident ^ freeVarList->fresh();
+            Node tmp = llvmir::Ident ^ freeVarList->fresh();
+            Node freeVarSlot = llvmir::Ident ^ freeVarList->fresh();
 
             // clang-format off
             Node getFreeVar = nullptr;
             if (ident == Global) {
               Node loadInstr =
-                (Instr
-                 << (MemoryOp
-                     << (Load << tmp
-                              << type->clone()
-                              << (Ident ^ node_val(ident)))));
+                (llvmir::Instr
+                 << (llvmir::MemoryOp
+                     << (llvmir::Load << tmp << type->clone() << irIdent)));
 
               getFreeVar = loadInstr;
             } else {
               Node bitcastInstr =
-                (Instr
-                 << (ConversionOp
-                     << (BitCast << tmp
-                                 << ident->clone()
-                                 << type->clone())));
+                (llvmir::Instr
+                 << (llvmir::ConversionOp
+                     << (llvmir::BitCast << tmp << irIdent->clone() << type->clone())));
 
               getFreeVar = bitcastInstr;
             }
 
             Node GEPFreeVarSlotInEnv =
-              (Instr
-               << (MemoryOp
-                   << (GetElementPtr
+              (llvmir::Instr
+               << (llvmir::MemoryOp
+                   << (llvmir::GetElementPtr
                        << freeVarSlot << envTy->clone() << envPtr->clone()
-                       << (OffsetList
-                           << (Offset << Ti32 << (IRValue ^ "0"))
-                           << (Offset << Ti32 << (IRValue ^ std::to_string(i)))))));
+                       << (llvmir::OffsetList
+                           << (llvmir::Offset << llvmir::Ti32
+                                              << (llvmir::IRValue ^ "0"))
+                           << (llvmir::Offset << llvmir::Ti32
+                                              << (llvmir::IRValue ^ std::to_string(i)))))));
             Node storeFreeVarInEnv =
-              (Instr
-               << (MemoryOp
-                   << (Store << tmp->clone() << freeVarSlot->clone())));
+              (llvmir::Instr
+               << (llvmir::MemoryOp
+                   << (llvmir::Store << tmp->clone() << freeVarSlot->clone())));
 
             seq << getFreeVar
                 << GEPFreeVarSlotInEnv
@@ -722,8 +756,8 @@ namespace miniml {
         /**
          * FreeVarList (Environment -> Registers)
          */
-        T(Compile) << T(Ident)[Env] * T(Ident)[TPtr] *
-              T(FreeVarList)[FreeVarList] * T(Load) >>
+        T(Compile) << T(llvmir::Ident)[Env] * T(llvmir::Ident)[TPtr] *
+              T(FreeVarList)[FreeVarList] * T(llvmir::Load) >>
           [](Match& _) -> Node {
           Node envPtr = _(TPtr);
           Node envTy = _(Env);
@@ -733,34 +767,37 @@ namespace miniml {
           for (size_t i = 0; i < freeVarList->size(); i++) {
             Node freeVar = freeVarList->at(i);
             Node ident = freeVar / Ident;
+            Node irIdent = llvmir::Ident ^ node_val(ident);
             Node type = getLLVMType(get_type(freeVar));
 
-            Node tmp = Ident ^ freeVarList->fresh();
-            Node freeVarSlot = Ident ^ freeVarList->fresh();
+            Node tmp = llvmir::Ident ^ freeVarList->fresh();
+            Node freeVarSlot = llvmir::Ident ^ freeVarList->fresh();
 
             // clang-format off
             Node GEPFreeVarSlotInEnv =
-              (Instr
-               << (MemoryOp
-                   << (GetElementPtr
+              (llvmir::Instr
+               << (llvmir::MemoryOp
+                   << (llvmir::GetElementPtr
                        << freeVarSlot->clone()
                        << envTy->clone()
                        << envPtr->clone()
-                       << (OffsetList
-                           << (Offset << Ti32 << (IRValue ^ "0"))
-                           << (Offset << Ti32 << (IRValue ^ std::to_string(i)))))));
+                       << (llvmir::OffsetList
+                           << (llvmir::Offset << llvmir::Ti32
+                                              << (llvmir::IRValue ^ "0"))
+                           << (llvmir::Offset << llvmir::Ti32
+                                              << (llvmir::IRValue ^ std::to_string(i)))))));
             Node loadFreeVarFromEnv =
-              (Instr
-               << (MemoryOp
-                   << (Load << tmp->clone() << type->clone() << freeVarSlot->clone())));
+              (llvmir::Instr
+               << (llvmir::MemoryOp
+                   << (llvmir::Load << tmp->clone() << type->clone() << freeVarSlot->clone())));
             Node allocaFreeVar =
-              (Instr
-               << (MemoryOp
-                   << (Alloca << ident->clone() << type->clone())));
+              (llvmir::Instr
+               << (llvmir::MemoryOp
+                   << (llvmir::Alloca << irIdent->clone() << type->clone())));
             Node storeFreeVarOnStack =
-              (Instr
-               << (MemoryOp
-                   << (Store << tmp->clone() << ident->clone())));
+              (llvmir::Instr
+               << (llvmir::MemoryOp
+                   << (llvmir::Store << tmp->clone() << irIdent->clone())));
 
             seq << GEPFreeVarSlotInEnv
                 << loadFreeVarFromEnv
@@ -777,7 +814,7 @@ namespace miniml {
           [](Match& _) -> Node {
           for (size_t i = 0; i < _(PropagateCompile)->size(); i++) {
             Node child = _(PropagateCompile)->at(i);
-            Node ident = Ident ^ _(PropagateCompile)->fresh();
+            Node ident = llvmir::Ident ^ _(PropagateCompile)->fresh();
             _(PropagateCompile)->replace_at(i, Compile << ident << child);
           }
 

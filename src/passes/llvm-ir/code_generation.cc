@@ -1,7 +1,5 @@
-#include "../../miniml-lang.hh"
-#include "../internal.hh"
+#include "../../llvm-lang.hh"
 #include "../llvm_utils.hh"
-#include "../utils.hh"
 #include "trieste/pass.h"
 #include "trieste/rewrite.h"
 #include "trieste/token.h"
@@ -15,7 +13,7 @@
 #include <llvm/IR/Verifier.h>
 #pragma clang diagnostic pop
 
-namespace miniml {
+namespace llvmir {
 
   using namespace trieste;
   using namespace llvm;
@@ -29,7 +27,7 @@ namespace miniml {
    * @brief
    * This pass lowers to LLVM IR code.
    */
-  PassDef generateLLVMIR() {
+  PassDef code_generation() {
     auto ctx = std::make_shared<LLVMIRContext>();
 
     /**
@@ -46,7 +44,7 @@ namespace miniml {
       pass =
         {
           "generateLLVMIR",
-          LLVMIRGeneration::wf,
+          llvmir::wf,
           dir::topdown | dir::once,
           {
             /**
@@ -276,10 +274,8 @@ namespace miniml {
                 result = ctx->builder.CreateICmpULT(lhs, rhs, resultId);
               } else if (op == SLT) {
                 result = ctx->builder.CreateICmpSLT(lhs, rhs, resultId);
-              } else {
-                return err(op, "Unknown comparison operator");
               }
-              assert(result);
+              assert(result && "Icmp - unexpected comparison operator");
 
               ctx->registers[resultId] = result;
 
@@ -518,10 +514,10 @@ namespace miniml {
             // Create Struct Type
             T(Action)[Action]
                 << (T(CreateStructType)
-                    << T(Ident)[Result] * T(IRTypeList)[IRTypeList]) >>
+                    << T(Ident)[Result] * T(TypeList)[TypeList]) >>
               [ctx](Match& _) -> Node {
               std::vector<llvm::Type*> fieldTypes;
-              for (auto irType : *_(IRTypeList)) {
+              for (auto irType : *_(TypeList)) {
                 llvm::Type* llvmType = createLLVMType(ctx, irType);
                 assert(llvmType);
 
@@ -543,7 +539,7 @@ namespace miniml {
             T(Action)[Action]
                 << (T(CreateFunType) << T(Ident)[Result] *
                       T(Ti1, Ti32, Ti64, TPtr)[IRType] *
-                      T(IRTypeList)[ParamList]) >>
+                      T(TypeList)[ParamList]) >>
               [ctx](Match& _) -> Node {
               Node returnType = _(IRType);
               llvm::Type* returnLLVMType = createLLVMType(ctx, returnType);

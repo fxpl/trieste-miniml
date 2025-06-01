@@ -25,7 +25,7 @@
 #include "llvm-ir/compile.cc"
 #include "llvm-ir/blockify.cc"
 #include "llvm-ir/reverse_blocks.cc"
-#include "llvm-ir/llvmIR.cc"
+#include "llvm-ir/code_generation.cc"
 // clang-format on
 
 namespace miniml {
@@ -57,17 +57,21 @@ namespace miniml {
       cleanup_constraints(),
       resolve_print(),
 
-      // LLVM IR generation
+      // Generate IR
       free_variables(),
       propagate_free_variables(),
       globals(),
       main_function(),
       closure_conversion(),
       closure_globals(),
+
+      // Compile to LLVM IR WF
       compile(),
       blockify(),
-      reverse_blocks(),
-      generateLLVMIR(),
+      llvmir::reverse_blocks(),
+
+      // Code generation
+      llvmir::code_generation(),
     };
   }
 }

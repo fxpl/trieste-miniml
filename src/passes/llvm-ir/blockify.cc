@@ -1,6 +1,6 @@
+#include "../../llvm-lang.hh"
 #include "../../miniml-lang.hh"
 #include "../internal.hh"
-#include "../llvm_utils.hh"
 #include "../utils.hh"
 #include "trieste/token.h"
 
@@ -30,36 +30,39 @@ namespace miniml {
   PassDef blockify() {
     return {
       "blockify",
-      LLVMIRBlockify::wf,
+      miniml::LLVMIRBlockify::wf,
       (dir::topdown),
       {
         /**
          * Initialize compile cursor for blockify pass.
          */
-        In(IRFun) * (T(Body)[Body] << (Start * !T(Block, Compile))) >>
+        In(llvmir::IRFun) *
+            (T(llvmir::Body)[Body] << (Start * !T(llvmir::Block, Compile))) >>
           [](Match& _) -> Node {
           auto children = *_(Body);
 
-          return Body << (Compile << children);
+          return llvmir::Body << (Compile << children);
         },
 
         /**
          * Create new block in current function.
          */
-        T(Compile)[Compile] << Start * T(Label)[Label] >> [](Match& _) -> Node {
-          Node block = Block ^ node_val(_(Label));
+        T(Compile)[Compile] << Start * T(llvmir::Label)[llvmir::Label] >>
+          [](Match& _) -> Node {
+          Node block = llvmir::Block ^ node_val(_(llvmir::Label));
           Node label = pop_front(_(Compile));
 
-          return Lift << Body << (block << label << _(Compile));
+          return Lift << llvmir::Body << (block << label << _(Compile));
         },
 
         /**
          * Add instruction to current block.
          */
-        T(Compile)[Compile] << Start * !T(Label) >> [](Match& _) -> Node {
+        T(Compile)[Compile] << Start * !T(llvmir::Label) >>
+          [](Match& _) -> Node {
           Node node = pop_front(_(Compile));
 
-          return Seq << (Lift << Block << node) << _(Compile);
+          return Seq << (Lift << llvmir::Block << node) << _(Compile);
         },
 
         /**

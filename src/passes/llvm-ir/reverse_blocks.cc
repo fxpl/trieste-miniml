@@ -1,10 +1,7 @@
-#include "../../miniml-lang.hh"
-#include "../internal.hh"
-#include "../llvm_utils.hh"
-#include "../utils.hh"
+#include "../../llvm-lang.hh"
 #include "trieste/token.h"
 
-namespace miniml {
+namespace llvmir {
 
   using namespace trieste;
 
@@ -29,7 +26,7 @@ namespace miniml {
   PassDef reverse_blocks() {
     return {
       "reverse_blocks",
-      LLVMIRBlockify::wf,
+      llvmir::wf,
       (dir::topdown | dir::once),
       {
         /**

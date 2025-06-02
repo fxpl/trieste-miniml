@@ -33,6 +33,7 @@ namespace llvmir {
   inline const auto Instr = TokenDef("instr_llvm");
   inline const auto Label = TokenDef("label_llvm", flag::print);
   inline const auto Block = TokenDef("basic_block_llvm", flag::print);
+  inline const auto Statements = TokenDef("statements_llvm", flag::print);
   inline const auto IRFun =
     TokenDef("ir_function_llvm", flag::print | flag::symtab);
 
@@ -67,6 +68,7 @@ namespace llvmir {
   inline const auto GetElementPtr = TokenDef("get_element_ptr_llvm");
 
   // TerminatorOps
+  inline const auto Terminator = TokenDef("terminator_llvm");
   inline const auto TerminatorOp = TokenDef("terminator_op_llvm");
   inline const auto Branch = TokenDef("branch_llvm");
   inline const auto Jump = TokenDef("jump_llvm");
@@ -130,7 +132,9 @@ namespace llvmir {
       | (ParamList <<= Param++)
         | (Param <<= Ident * (Type >>= wf_llvm_types))
       | (Body <<= (Block)++[1])
-        | (Block <<= (Instr | Label | Action)++[1])
+        | (Block <<= (Label * Statements * Terminator))
+         | (Statements <<= (Instr | Action)++)
+         | (Terminator <<= TerminatorOp)
     // Builder actions, which aren't LLVM IR instructions.
     | (Action <<= (CreateConst | CreateStructType | CreateFunType | GetFunction | GetType | GetSizeOfType))
       | (CreateConst <<= Ident * (Type >>= Ti64 | Ti32 | Ti1) * IRValue)
@@ -142,7 +146,7 @@ namespace llvmir {
       | (GetType <<= (Result >>= Ident) * (Type >>= Ident))
       | (GetSizeOfType <<= (Result >>= Ident) * (Type >>= (Ti32 | Ti64)) * (IRType >>= Ident))
     // LLVM IR instructions.
-    | (Instr <<= (BinaryOp | MemoryOp | TerminatorOp | MiscOp | ConversionOp))
+    | (Instr <<= (BinaryOp | MemoryOp | MiscOp | ConversionOp))
     | (BinaryOp <<= (Add | Sub | Mul))
       | (Add <<= (Result >>= Ident) * (Type >>= Ti32) * (Lhs >>= Ident) * (Rhs >>= Ident))
       | (Sub <<= (Result >>= Ident) * (Type >>= Ti32) * (Lhs >>= Ident) * (Rhs >>= Ident))
@@ -162,12 +166,12 @@ namespace llvmir {
       | (Phi <<= (Result >>= Ident) * (Type >>= wf_llvm_types) * PredecessorList)
         | (PredecessorList <<= Predecessor++)
           | (Predecessor <<= (IRValue >>= Ident) * Label)
+    | (ConversionOp <<= (BitCast))
+      | (BitCast <<= (Result >>= Ident) * (IRValue >>= Ident) * (IRType >>= (Ident | wf_llvm_types)))
     | (TerminatorOp <<= (Branch | Jump | Ret))
       | (Branch <<= (Cond >>= Ident) * (True >>= Label) * (False >>= Label))
       | (Jump <<= (Label))
       | (Ret <<= Ident)
-    | (ConversionOp <<= (BitCast))
-      | (BitCast <<= (Result >>= Ident) * (IRValue >>= Ident) * (IRType >>= (Ident | wf_llvm_types)))
     ;
   // clang-format on
 }

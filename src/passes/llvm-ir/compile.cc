@@ -273,32 +273,27 @@ namespace miniml {
           // clang-format off
           return Seq
             << (Compile << condId << _(Cond))
-            << (llvmir::Instr
-                << (llvmir::TerminatorOp
-                    << (llvmir::Branch
-                        << condId->clone()
-                        << thenLabel->clone()
-                        << elseLabel->clone())))
+            << (llvmir::TerminatorOp
+                << (llvmir::Branch
+                    << condId->clone()
+                    << thenLabel->clone()
+                    << elseLabel->clone()))
             << (thenLabel)
             << (Compile << ifTrueId->clone() << _(True))
-            << (llvmir::Instr
-                << (llvmir::TerminatorOp
-                    << (llvmir::Jump << thenEndLabel->clone())))
+            << (llvmir::TerminatorOp
+                << (llvmir::Jump << thenEndLabel->clone()))
             // "Landing" block so Phi unaffected by branching in Then/Else expr.
             << (thenEndLabel)
-            << (llvmir::Instr
-                << (llvmir::TerminatorOp
-                    << (llvmir::Jump << ifEndLabel->clone())))
+            << (llvmir::TerminatorOp
+                << (llvmir::Jump << ifEndLabel->clone()))
             << (elseLabel)
             << (Compile << ifFalseId->clone() << _(False))
-            << (llvmir::Instr
-                << (llvmir::TerminatorOp
-                    << (llvmir::Jump << elseEndLabel->clone())))
+            << (llvmir::TerminatorOp
+                << (llvmir::Jump << elseEndLabel->clone()))
             // "Landing" block so Phi unaffected by branching in Then/Else expr.
             << (elseEndLabel)
-            << (llvmir::Instr
-                << (llvmir::TerminatorOp
-                    << (llvmir::Jump << ifEndLabel->clone())))
+            << (llvmir::TerminatorOp
+                << (llvmir::Jump << ifEndLabel->clone()))
             << (ifEndLabel)
             << (llvmir::Instr
                 << (llvmir::MiscOp
@@ -467,15 +462,14 @@ namespace miniml {
           Node entryPoint = llvmir::Label ^ ("entry_" + uniqueId);
           Node returnId = llvmir::Ident ^ ("ret_" + uniqueId);
 
-          Node irfun = llvmir::IRFun ^ node_val(fun);
+          Node llvmFun = llvmir::IRFun ^ node_val(fun);
           Node returnInstr =
-            (llvmir::Instr
-             << (llvmir::TerminatorOp << (llvmir::Ret << returnId->clone())));
+            (llvmir::TerminatorOp << (llvmir::Ret << returnId->clone()));
 
           if ("main" == node_val(fun)) {
             // clang-format off
             return Seq
-              << (irfun
+              << (llvmFun
                   << funType
                   << (Compile << paramList)
                   << (llvmir::Body
@@ -501,7 +495,7 @@ namespace miniml {
 
             // clang-format off
             return Seq
-              << (irfun
+              << (llvmFun
                   << funType
                   << (Compile << paramList)
                   << (llvmir::Body

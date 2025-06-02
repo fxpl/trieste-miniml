@@ -340,11 +340,9 @@ namespace llvmir {
              * Terminating Operations.
              */
             // Branch
-            T(Instr)[Instr]
-                << (T(TerminatorOp)
-                    << (T(Branch)
-                        << (T(Ident)[Cond] * T(Label)[True] *
-                            T(Label)[False]))) >>
+            T(TerminatorOp)
+                << (T(Branch)
+                    << (T(Ident)[Cond] * T(Label)[True] * T(Label)[False])) >>
               [ctx](Match& _) -> Node {
               std::string condId = node_val(_(Cond));
               Value* cond = ctx->registers[condId];
@@ -360,12 +358,11 @@ namespace llvmir {
 
               ctx->builder.CreateCondBr(cond, trueBlock, falseBlock);
 
-              return _(Instr);
+              return NoChange;
             },
 
             // Jump
-            T(Instr)[Instr]
-                << (T(TerminatorOp) << (T(Jump) << (T(Label)[Label]))) >>
+            T(TerminatorOp) << (T(Jump) << (T(Label)[Label])) >>
               [ctx](Match& _) -> Node {
               std::string blockId = node_val(_(Label));
               llvm::BasicBlock* block = ctx->basicBlocks[blockId];
@@ -373,12 +370,11 @@ namespace llvmir {
 
               ctx->builder.CreateBr(block);
 
-              return _(Instr);
+              return NoChange;
             },
 
             // Return
-            T(Instr)[Instr]
-                << (T(TerminatorOp) << (T(Ret) << T(Ident)[Ident])) >>
+            T(TerminatorOp) << (T(Ret) << T(Ident)[Ident]) >>
               [ctx](Match& _) -> Node {
               std::string resultId = node_val(_(Ident));
               Value* result = ctx->registers[resultId];
@@ -386,7 +382,7 @@ namespace llvmir {
 
               ctx->builder.CreateRet(result);
 
-              return _(Instr);
+              return NoChange;
             },
 
             /**

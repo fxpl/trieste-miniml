@@ -30,7 +30,7 @@ namespace miniml {
   PassDef blockify() {
     return {
       "blockify",
-      miniml::LLVMIRBlockify::wf,
+      llvmir::wf,
       (dir::topdown | dir::once),
       {
         In(llvmir::IRFun) *
@@ -38,17 +38,22 @@ namespace miniml {
           [](Match& _) -> Node {
           Node blockifiedBody = llvmir::Body;
 
-          Node currentBlock = nullptr;
+          Node block = nullptr;
+          Node statements = nullptr;
           for (Node child : *_(Body)) {
             if (child == llvmir::Label) {
-              currentBlock = llvmir::Block ^ node_val(child);
-              currentBlock->push_back(child);
-            } else if (child->front() == llvmir::TerminatorOp) {
-              currentBlock->push_back(child);
-              blockifiedBody->push_back(currentBlock);
-              currentBlock = nullptr;
+              block = llvmir::Block ^ node_val(child);
+              block->push_back(child);
+              statements = llvmir::Statements;
+            } else if (child == llvmir::TerminatorOp) {
+              block->push_back(statements);
+              block->push_back(llvmir::Terminator << child);
+              blockifiedBody->push_back(block);
+
+              block = nullptr;
+              statements = nullptr;
             } else {
-              currentBlock->push_back(child);
+              statements->push_back(child);
             }
           }
 

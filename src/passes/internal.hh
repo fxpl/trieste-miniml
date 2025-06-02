@@ -219,20 +219,12 @@ namespace miniml{
         ;
     }
 
-  namespace LLVMIRCompilation{
+    namespace LLVMIRCompilation{
 
-    inline const auto wf = 
-    llvmir::wf - llvmir::Block
-    | (llvmir::Body <<= (llvmir::Instr | llvmir::Label | llvmir::Action)++[1])
-    ;
-  }
-
-  namespace LLVMIRBlockify {
-
-    inline const auto wf = LLVMIRCompilation::wf
-    | (llvmir::Body <<= (llvmir::Block)++[1])
-    | (llvmir::Block <<= (llvmir::Label | llvmir::Instr | llvmir::Action)++[1])
-    ;
-  }
+      inline const auto wf = 
+      llvmir::wf - llvmir::Block
+      | (llvmir::Body <<= (llvmir::Label | llvmir::Action | llvmir::Instr | llvmir::TerminatorOp)++[1])
+      ;
+    }
 }
 // clang-format on

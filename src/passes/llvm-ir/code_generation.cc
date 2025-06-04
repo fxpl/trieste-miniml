@@ -156,7 +156,7 @@ namespace llvmir {
               assert(type);
 
               std::vector<Value*> offsets;
-              for (size_t i = 0; i < _(OffsetList)->size(); i++) {
+              for (size_t i = 0, n = _(OffsetList)->size(); i < n; i++) {
                 Node offsetNode = _(OffsetList)->at(i);
 
                 std::string valStr = node_val(offsetNode / IRValue);
@@ -197,7 +197,7 @@ namespace llvmir {
               assert(function);
 
               std::vector<llvm::Value*> arguments;
-              for (size_t i = 0; i < _(ArgList)->size(); i++) {
+              for (size_t i = 0, n = _(ArgList)->size(); i < n; i++) {
                 Node arg = _(ArgList)->at(i);
                 std::string argId = node_val(arg);
                 Value* argVal = ctx->registers[argId];
@@ -231,7 +231,7 @@ namespace llvmir {
               assert(functionPtr);
 
               std::vector<llvm::Value*> arguments;
-              for (size_t i = 0; i < _(ArgList)->size(); i++) {
+              for (size_t i = 0, n = _(ArgList)->size(); i < n; i++) {
                 Node arg = _(ArgList)->at(i);
                 std::string argId = node_val(arg);
                 Value* argVal = ctx->registers[argId];
@@ -442,7 +442,7 @@ namespace llvmir {
               assert(returnLLVMType);
 
               std::vector<llvm::Type*> paramTypes;
-              for (size_t i = 0; i < _(ParamList)->size(); i++) {
+              for (size_t i = 0, n = _(ParamList)->size(); i < n; i++) {
                 Node param = _(ParamList)->at(i);
                 Node type = param / Type;
                 llvm::Type* llvmType = createLLVMType(ctx, type);
@@ -542,7 +542,7 @@ namespace llvmir {
               assert(returnLLVMType);
 
               std::vector<llvm::Type*> paramTypes;
-              for (size_t i = 0; i < _(ParamList)->size(); i++) {
+              for (size_t i = 0, n = _(ParamList)->size(); i < n; i++) {
                 Node paramTy = _(ParamList)->at(i);
                 llvm::Type* llvmType = createLLVMType(ctx, paramTy);
                 assert(llvmType);
@@ -668,7 +668,7 @@ namespace llvmir {
 
       Argument* arg = function->arg_begin();
       Node paramList = functionToken / ParamList;
-      for (size_t i = 0; i < paramList->size(); i++) {
+      for (size_t i = 0, n = paramList->size(); i < n; i++) {
         Node param = paramList->at(i);
         std::string paramName = node_val(param / Ident);
         arg->setName(paramName);

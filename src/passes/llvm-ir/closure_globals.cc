@@ -21,7 +21,7 @@ namespace miniml {
           [](Match& _) -> Node {
           Node freeVarList = _(FreeVarList);
 
-          for (size_t i = 0; i < freeVarList->size(); i++) {
+          for (size_t i = 0, n = freeVarList->size(); i < n; i++) {
             Node freeVar = freeVarList->at(i);
             Node ident = freeVar / Ident;
             Node type = freeVar / Type;

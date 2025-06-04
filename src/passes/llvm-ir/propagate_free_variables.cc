@@ -15,7 +15,7 @@ namespace miniml {
     return {
       "propagate_free_variables",
       closures::wf_freeVars,
-      (dir::bottomup | dir::once),
+      (dir::bottomup),
       {
         // Find free variables and their function definition.
         In(FreeVarList) * T(FreeVar)[FreeVar] >> [](Match& _) -> Node {
@@ -25,20 +25,22 @@ namespace miniml {
 
           Node enclosingFun = ident->scope()->scope();
           if (enclosingFun != Fun) {
-            return freeVar;
+            return NoChange;
           }
 
-          if (ident->lookup(enclosingFun).empty()) {
-            Node enclosingFreeVars = enclosingFun / FunDef / FreeVarList;
-            for (Node enclosedFreeVar : *enclosingFreeVars) {
-              std::string enclosedName = node_val(enclosedFreeVar / Ident);
-              if (name == enclosedName) {
-                return freeVar;
-              }
+          if (ident->lookup(enclosingFun).empty() == false) {
+            return NoChange;
+          }
+
+          Node enclosingFreeVars = enclosingFun / FunDef / FreeVarList;
+          for (Node enclosedFreeVar : *enclosingFreeVars) {
+            std::string enclosedName = node_val(enclosedFreeVar / Ident);
+            if (name == enclosedName) {
+              return NoChange;
             }
-
-            enclosingFreeVars->push_back(freeVar->clone());
           }
+
+          enclosingFreeVars->push_back(freeVar->clone());
 
           return freeVar;
         },

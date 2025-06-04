@@ -82,3 +82,10 @@ let j = 10;;
 let sum = fun y (x:int) is a+b+c+d+e+f+g+h+i+j+x;;
 let ans = sum(0);;
 print((ans = 55));;
+
+(*Application of CreateClosure*)
+(fun f_6 (t_4:int) is t_4 + ((8) + (t_4)))((fun f_7 (t_5:int) is t_5 + (85))(45));;
+
+(*Propagate free var across multiple scopes - Triggers assert(src)*)
+let fv = 2;;
+let f_0 = fun f (x:int) is x + ((fun g (y:int) is y + ((fun h (z:int) is z + fv)(54)))(1));;

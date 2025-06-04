@@ -57,7 +57,7 @@ namespace miniml {
                              << (env->clone())
                              << (freeVarList->clone())
                              << (Body << expr)))
-                     << pointerType->clone()
+                     << funType->clone()
                      << (CreateClosure << lambdaId
                                        << env->clone()
                                        << freeVarList->clone());

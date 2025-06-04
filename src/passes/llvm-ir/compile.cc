@@ -46,7 +46,7 @@ namespace miniml {
         T(Compile) << T(llvmir::Program)[Program] >> [](Match& _) -> Node {
           Node prog = _(Program);
 
-          for (size_t i = 0; i < prog->size(); i++) {
+          for (size_t i = 0, n = prog->size(); i < n; i++) {
             Node topexpr = prog->at(i);
             if (topexpr == TopExpr || topexpr == Expr) {
               Node ident = llvmir::Ident ^ prog->fresh();
@@ -517,7 +517,7 @@ namespace miniml {
             return {};
           }
 
-          for (size_t i = 0; i < env->size(); i++) {
+          for (size_t i = 0, n = env->size(); i < n; i++) {
             Node type = env->at(i);
             env->replace_at(i, (Compile << type));
           }
@@ -662,7 +662,7 @@ namespace miniml {
         T(Compile) << T(ParamList)[ParamList] >> [](Match& _) -> Node {
           Node paramList = _(ParamList);
 
-          for (size_t i = 0; i < paramList->size(); i++) {
+          for (size_t i = 0, n = paramList->size(); i < n; i++) {
             Node param = paramList->at(i);
             paramList->replace_at(i, (Compile << param));
           }
@@ -696,7 +696,7 @@ namespace miniml {
           Node freeVarList = _(FreeVarList);
 
           Node seq = Seq;
-          for (size_t i = 0; i < freeVarList->size(); i++) {
+          for (size_t i = 0, n = freeVarList->size(); i < n; i++) {
             Node freeVar = freeVarList->at(i);
             Node ident = freeVar / Ident;
             Node irIdent = llvmir::Ident ^ node_val(ident);
@@ -758,7 +758,7 @@ namespace miniml {
           Node freeVarList = _(FreeVarList);
 
           Node seq = Seq;
-          for (size_t i = 0; i < freeVarList->size(); i++) {
+          for (size_t i = 0, n = freeVarList->size(); i < n; i++) {
             Node freeVar = freeVarList->at(i);
             Node ident = freeVar / Ident;
             Node irIdent = llvmir::Ident ^ node_val(ident);
@@ -806,7 +806,7 @@ namespace miniml {
         // Propagate Compile onto several nodes.
         T(Compile) << T(PropagateCompile)[PropagateCompile] >>
           [](Match& _) -> Node {
-          for (size_t i = 0; i < _(PropagateCompile)->size(); i++) {
+          for (size_t i = 0, n = _(PropagateCompile)->size(); i < n; i++) {
             Node child = _(PropagateCompile)->at(i);
             Node ident = llvmir::Ident ^ _(PropagateCompile)->fresh();
             _(PropagateCompile)->replace_at(i, Compile << ident << child);

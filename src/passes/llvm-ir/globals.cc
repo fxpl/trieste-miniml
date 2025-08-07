@@ -17,7 +17,6 @@ namespace miniml {
       closures::wf_freeVars,
       (dir::bottomup | dir::once),
       {
-        // Find free variables and their function definition.
         In(Expr) * T(Ident)[Ident] >> [](Match& _) -> Node {
           Node ident = _(Ident);
           std::string identName = node_val(ident);
@@ -31,7 +30,9 @@ namespace miniml {
 
             // Parameters from other functions are loaded from environment.
             Node parent = _(Ident)->parent(FunDef);
-            if ((def->type() == Param || def->type() == FunDef) && def->parent(Fun)->front() != parent) {
+            if (
+              (def->type() == Param || def->type() == FunDef) &&
+              def->parent(Fun)->front() != parent) {
               return Global ^ identName;
             }
           }

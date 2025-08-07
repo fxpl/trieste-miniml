@@ -7,7 +7,7 @@ namespace miniml {
   // Ensure that the program does not contain polymorphic types.
   PassDef resolve_polymorphism() {
     return {
-      "resolve_print",
+      "resolve_polymorphism",
       check::wf,
       (dir::bottomup),
       {

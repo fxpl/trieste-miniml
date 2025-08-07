@@ -10,8 +10,6 @@ namespace llvmir {
 
   // --- Types ---
   inline const auto TypeList = TokenDef("ir_type_list_llvm");
-  inline const auto Type = TokenDef("type_llvm");
-  inline const auto IRType = TokenDef("ir_type_llvm");
   inline const auto TypeArrow = TokenDef("type_arrow_llvm");
 
   inline const auto TVoid = TokenDef("void_llvm");
@@ -23,19 +21,17 @@ namespace llvmir {
   // Arithmetic operators
 
   // Functions
-  inline const auto Fun = TokenDef("fun_llvm", flag::print | flag::symtab);
-  inline const auto FunDef =
-    TokenDef("fundef_llvm", flag::lookup | flag::shadowing);
+  inline const auto IRFun =
+    TokenDef("ir_function_llvm", flag::print | flag::symtab);
   inline const auto ParamList = TokenDef("param_list_llvm");
   inline const auto Param =
     TokenDef("param_llvm", flag::lookup | flag::shadowing);
   inline const auto Body = TokenDef("body_llvm");
-  inline const auto Instr = TokenDef("instr_llvm");
-  inline const auto Label = TokenDef("label_llvm", flag::print);
   inline const auto Block = TokenDef("basic_block_llvm", flag::print);
-  inline const auto Statements = TokenDef("statements_llvm", flag::print);
-  inline const auto IRFun =
-    TokenDef("ir_function_llvm", flag::print | flag::symtab);
+  inline const auto Label = TokenDef("label_llvm", flag::print);
+  inline const auto Statements = TokenDef("statements_llvm");
+  inline const auto Instr = TokenDef("instr_llvm");
+  inline const auto Terminator = TokenDef("terminator_llvm");
 
   // Identifiers
   inline const auto Ident = TokenDef("ident_llvm", flag::print);
@@ -68,7 +64,6 @@ namespace llvmir {
   inline const auto GetElementPtr = TokenDef("get_element_ptr_llvm");
 
   // TerminatorOps
-  inline const auto Terminator = TokenDef("terminator_llvm");
   inline const auto TerminatorOp = TokenDef("terminator_op_llvm");
   inline const auto Branch = TokenDef("branch_llvm");
   inline const auto Jump = TokenDef("jump_llvm");
@@ -104,13 +99,14 @@ namespace llvmir {
   inline const auto Offset = TokenDef("offset_llvm");
 
   // Convenience tokens
-  inline const auto Name = TokenDef("name_llvm", flag::print);
+  inline const auto Fun = TokenDef("fun_llvm");
+  inline const auto Type = TokenDef("type_llvm");
+  inline const auto IRType = TokenDef("ir_type_llvm");
   inline const auto Op = TokenDef("op_llvm");
   inline const auto Lhs = TokenDef("lhs_llvm");
   inline const auto Rhs = TokenDef("rhs_llvm");
   inline const auto Ty1 = TokenDef("ty1_llvm");
   inline const auto Ty2 = TokenDef("ty2_llvm");
-  inline const auto TODO = TokenDef("TODO_llvm:", flag::print);
   inline const auto Src = TokenDef("src_llvm");
   inline const auto Dst = TokenDef("dst_llvm");
   inline const auto Result = TokenDef("result_llvm");
@@ -139,7 +135,6 @@ namespace llvmir {
     | (Action <<= (CreateConst | CreateStructType | CreateFunType | GetFunction | GetType | GetSizeOfType))
       | (CreateConst <<= Ident * (Type >>= Ti64 | Ti32 | Ti1) * IRValue)
       | (CreateStructType <<= Ident * TypeList)
-        | (TypeList <<= wf_llvm_types++)
       | (CreateFunType <<= (Result >>= Ident) * (Type >>= wf_llvm_types) * TypeList)
         | (TypeList <<= wf_llvm_types++)
       | (GetFunction <<= (Result >>= Ident) * (Fun >>= Ident))

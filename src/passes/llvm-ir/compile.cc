@@ -45,21 +45,18 @@ namespace miniml {
          */
         T(Compile) << T(llvmir::Program)[Program] >> [](Match& _) -> Node {
           Node prog = _(Program);
+          Node new_prog = llvmir::Program;
 
-          for (size_t i = 0, n = prog->size(); i < n; i++) {
-            Node topexpr = prog->at(i);
+          for (auto topexpr : *prog) {
             if (topexpr == TopExpr || topexpr == Expr) {
               Node ident = llvmir::Ident ^ prog->fresh();
-              prog->replace_at(i, Compile << ident << topexpr);
+              new_prog->push_back(Compile << ident << topexpr);
             } else {
-              prog->replace_at(i, Compile << topexpr);
+              new_prog->push_back(Compile << topexpr);
             }
           }
 
-          auto topExpressions = *_(Program);
-          prog->erase(prog->begin(), prog->end());
-
-          return Seq << (prog << topExpressions);
+          return new_prog;
         },
 
         /**
@@ -338,6 +335,9 @@ namespace miniml {
           Node fun = closCall / Fun;
           Node param = closCall / Param;
           Node typeArrow = get_type(fun);
+          if (typeArrow != TypeArrow) {
+            return err(typeArrow, "closure call type is not a function type");
+          }
           Node funArgType = typeArrow / Ty1;
           Node funRetType = typeArrow / Ty2;
 
@@ -451,6 +451,9 @@ namespace miniml {
 
           // TODO: Support polymorphism (Tvar)
           Node type = get_type(fun);
+          if (type != TypeArrow) {
+            return err(type, "function type is not a function type");
+          }
           Node paramType = getLLVMType(type / Ty1);
           assert(paramType);
           Node returnType = getLLVMType(type / Ty2);

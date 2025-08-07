@@ -657,14 +657,20 @@ namespace llvmir {
 
       return 0;
     });
+    
+    pass.post(IRFun, [ctx](Node functionToken) {
+      std::string fun_name = node_val(functionToken);
+      Function* fun = ctx->llvm_module.getFunction(fun_name);
+      verifyFunction(*fun, &llvm::errs());
+
+      return 0;
+    });
 
     pass.post([ctx](Node) {
-      // FIXME: Should verify all functions.
       Function* main = ctx->llvm_module.getFunction("main");
       verifyFunction(*main, &llvm::errs());
       verifyModule(ctx->llvm_module, &llvm::errs());
 
-      // TODO: Figure out how to output. into file? into clang via API?
       // FIXME: Temporarily write generated LLVM IR to file so can be compiled
       // by make command.
       std::error_code errorCode;

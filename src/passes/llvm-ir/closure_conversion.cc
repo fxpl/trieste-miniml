@@ -14,7 +14,7 @@ namespace miniml {
    * For each inline lambda the pass performs the following actions:
    * - Creates an environment type declaration.
    * - Converts the function into a lambda (lifted to program level).
-   * - Creates closure inplace of old fun declaration.
+   * - Creates closure in place of old fun declaration.
    */
   PassDef closure_conversion() {
     return {
@@ -40,7 +40,7 @@ namespace miniml {
           }
 
           Node lambda = IRFun ^ "lambda_" + uniqueId;
-          Node lambdaId = Ident ^ node_val(lambda);
+          Node lambdaId = Ident ^ lambda;
           Node envName = (Ident ^ "env");
 
           Node pointerType = Type << TPtr;

@@ -1,6 +1,5 @@
 #include "../../llvm-lang.hh"
 #include "../../miniml-lang.hh"
-#include "../internal.hh"
 #include "../utils.hh"
 #include "trieste/token.h"
 
@@ -9,23 +8,8 @@ namespace miniml {
   using namespace trieste;
 
   /**
-   * @brief
-   *
-   * Transforms the program from a linear stream of instructions
-   * into a program->function->block->instruction structure:
-   *
-   *         Top
-   *        /   \
-   *    Ident   Program
-   *           /   |   \
-   *       Func  Func  Func
-   *               |
-   *             Body
-   *            /    \
-   *         Block  Block
-   *        /  |  \
-   *   Label Instr Instr
-   *
+   * Transforms the body of functions from a linear sequence of instructions
+   * into an hierarchical structure consisting of blocks.
    */
   PassDef blockify() {
     return {

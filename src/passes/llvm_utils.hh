@@ -22,22 +22,21 @@ namespace llvmir {
   using namespace llvm;
 
   struct LLVMIRContext {
-    // LLVM Code generation APIs:
-    // LLVMContext - Holds core data structures, Type and constant value tables.
-    // IRBuilder - Generates LLVM IR instructions.
-    // Module - Contains generated instructions, local and global value tables.
+    // Holds core data structures, Type and constant value tables.
     llvm::LLVMContext llvm_context;
+    // Generates LLVM IR instructions.
     // FIXME: NoFolder is used to prevent constant folding.
     llvm::IRBuilder<NoFolder> builder;
+    // Contains generated instructions, local and global value tables.
     llvm::Module llvm_module;
 
     // Keeps track of generated BasicBlocks within program
-    std::map<std::string, llvm::BasicBlock*> basicBlocks;
+    std::unordered_map<std::string, llvm::BasicBlock*> basicBlocks;
     // Keeps track of generated LLVM types within program
-    std::map<std::string, llvm::Type*> types;
+    std::unordered_map<std::string, llvm::Type*> types;
 
     // Keeps track of generated LLVM values within a function
-    std::map<std::string, llvm::Value*> registers;
+    std::unordered_map<std::string, llvm::Value*> registers;
 
     LLVMIRContext()
     : builder(llvm_context), llvm_module("miniML", llvm_context) {}

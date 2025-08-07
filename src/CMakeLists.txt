@@ -30,6 +30,7 @@ main.cc
 passes/passes.cc
 passes/utils.cc
 passes/llvm_utils.cc
+runtime.cc
 )
 
 # Link

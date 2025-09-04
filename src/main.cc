@@ -3,11 +3,11 @@
 #include <trieste/driver.h>
 
 int main(int argc, char** argv) {
-  // Ugly hack to get the input filepath name to the code gen pass.
+  // Ugly hack to get the input filepaths to the code gen pass.
   // Sorry, but I'm pressed for time.
 
-  std::string input_filepath;
-  std::string output_filepath;
+  std::string input_filepath = "";
+  std::string output_filepath = "";
 
   for (int i = 0; i < argc; i++) {
     std::string arg = argv[i];

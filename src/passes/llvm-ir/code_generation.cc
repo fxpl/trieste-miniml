@@ -662,7 +662,9 @@ namespace llvmir {
 
       std::string outfile;
       if (!ctx->output_file.empty()) {
-        outfile = ctx->output_file.replace_extension(".ll").string();
+        std::filesystem::path filepath =
+          std::filesystem::absolute(ctx->output_file);
+        outfile = filepath.replace_extension(".ll").string();
       } else {
         outfile = "./out.ll";
       }

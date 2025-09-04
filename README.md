@@ -1,4 +1,4 @@
-# MiniMl-Trieste
+# MiniML-Trieste
 
 This project implements a MiniML to LLVM IR compiler in Trieste.
 

@@ -7,7 +7,7 @@ build/miniml: build
 	cd build; ninja
 
 build:
-	mkdir -p build; cd build; cmake -G Ninja ../src -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_STANDARD=20 -DCMAKE_EXPORT_COMPILE_COMMANDS=1
+	mkdir -p build; cd build; cmake -G Ninja ../src -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_STANDARD=20 -DCMAKE_EXPORT_COMPILE_COMMANDS=1
 
 buildf:
 	touch out/$f.trieste; ./build/miniml build examples/$f.miniml -o out/$f.trieste
@@ -32,34 +32,19 @@ out/%.trieste: examples/%.miniml | out
 
 test: $(OBJECTS) $(FAILING_OBJECTS)
 
-clean:
-	rm -rf out/* *.trieste; rm -rf build; rm -rf out
+experiment: out
+	python run_experiments.py
 
-.PHONY: clean all build/miniml test
-
-## MANUAL TESTS FOR DEVELOPMENT ##
-llvm: out generate-code print-ast print-miniml print-ll compile-llvm
-
-ast: out generate-code print-ast print-miniml
+llvm: out generate-code compile-llvm
 
 generate-code: all
 	touch out/test.trieste; > out/test.trieste; ./build/miniml build llvmir_tests/test.miniml -o out/test.trieste;
-
-print-miniml:
-	cat llvmir_tests/test.miniml
-
-print-ll:
-	cat out/test.ll
-
-print-ast:
-	cat out/test.trieste
 
 compile-llvm:
 # This is a test for the LLVM IR files. It compiles the LLVM IR file, runs it and prints returnval to stdout.
 	clang out/test.ll -o out/test.out; ./out/test.out; echo $$?
 
-opt-llvm:
-	opt out/test.ll -O$O -S -o out/test2.ll; cat out/test2.ll
+clean:
+	rm -rf out/* *.trieste; rm -rf build; rm -rf out
 
-test-llvm: all
-	touch out/test.trieste; > out/test.trieste; touch out/test.ll; > out/test.ll; ./build/miniml build llvmir_tests/test.miniml --log_level Debug -o out/test.trieste; clang out/test.ll -o out/test.out; ./out/test.out; echo $$?
+.PHONY: clean all build/miniml test

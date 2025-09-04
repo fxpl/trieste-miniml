@@ -38,8 +38,13 @@ namespace llvmir {
     // Keeps track of generated LLVM values within a function
     std::unordered_map<std::string, llvm::Value*> registers;
 
-    LLVMIRContext()
-    : builder(llvm_context), llvm_module("miniML", llvm_context) {}
+    // Trieste's output file, if any.
+    std::filesystem::path output_file;
+
+    LLVMIRContext(std::string input_filepath, std::string output_filepath)
+    : builder(llvm_context),
+      llvm_module(input_filepath, llvm_context),
+      output_file(std::filesystem::absolute(output_filepath)) {}
 
     ~LLVMIRContext() {}
   };

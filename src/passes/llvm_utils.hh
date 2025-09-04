@@ -39,12 +39,12 @@ namespace llvmir {
     std::unordered_map<std::string, llvm::Value*> registers;
 
     // Trieste's output file, if any.
-    std::filesystem::path output_file;
+    std::string output_file;
 
     LLVMIRContext(std::string input_filepath, std::string output_filepath)
     : builder(llvm_context),
       llvm_module(input_filepath, llvm_context),
-      output_file(std::filesystem::absolute(output_filepath)) {}
+      output_file(output_filepath) {}
 
     ~LLVMIRContext() {}
   };

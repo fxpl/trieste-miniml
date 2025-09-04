@@ -30,12 +30,12 @@ namespace llvmir {
     // Contains generated instructions, local and global value tables.
     llvm::Module llvm_module;
 
-    // Keeps track of generated BasicBlocks within program
+    // Keeps track of generated BasicBlocks within program.
     std::unordered_map<std::string, llvm::BasicBlock*> basicBlocks;
-    // Keeps track of generated LLVM types within program
+    // Keeps track of generated LLVM types within program.
     std::unordered_map<std::string, llvm::Type*> types;
 
-    // Keeps track of generated LLVM values within a function
+    // Keeps track of generated LLVM values within a function.
     std::unordered_map<std::string, llvm::Value*> registers;
 
     // Trieste's output file, if any.

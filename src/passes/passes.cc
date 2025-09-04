@@ -37,7 +37,8 @@ namespace miniml {
     return init_parse::parser();
   }
 
-  std::vector<Pass> passes(std::string input_filepath, std::string output_filepath) {
+  std::vector<Pass>
+  passes(std::string input_filepath, std::string output_filepath) {
     return {
       // Parsing
       parse_cleanup(),
@@ -71,7 +72,7 @@ namespace miniml {
       closure_conversion(),
       closure_globals(),
 
-      // Compile to LLVM IR WF
+      // Compile to LLVM IR AST
       compile(),
       blockify(),
 

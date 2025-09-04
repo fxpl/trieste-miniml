@@ -37,7 +37,7 @@ namespace miniml {
     return init_parse::parser();
   }
 
-  std::vector<Pass> passes() {
+  std::vector<Pass> passes(std::string input_filepath, std::string output_filepath) {
     return {
       // Parsing
       parse_cleanup(),
@@ -76,7 +76,7 @@ namespace miniml {
       blockify(),
 
       // Code generation
-      llvmir::code_generation(),
+      llvmir::code_generation(input_filepath, output_filepath),
     };
   }
 }

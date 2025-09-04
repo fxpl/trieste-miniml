@@ -6,7 +6,7 @@
 namespace miniml{
  using namespace trieste;
 
-    std::vector<Pass> passes();
+    std::vector<Pass> passes(std::string input_filepath, std::string output_filepath);
     Parse parser();
 
     inline const auto wf_types = TInt | TBool | TVar | TypeArrow ;

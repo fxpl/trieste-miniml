@@ -23,8 +23,9 @@ namespace llvmir {
    * @brief
    * This pass lowers to LLVM IR code.
    */
-  PassDef code_generation() {
-    auto ctx = std::make_shared<LLVMIRContext>();
+  PassDef
+  code_generation(std::string input_filepath, std::string output_filepath) {
+    auto ctx = std::make_shared<LLVMIRContext>(input_filepath, output_filepath);
 
     /**
      * Bottom up pass that "recursively" generates LLVM IR.
@@ -671,10 +672,14 @@ namespace llvmir {
       verifyFunction(*main, &llvm::errs());
       verifyModule(ctx->llvm_module, &llvm::errs());
 
-      // FIXME: Temporarily write generated LLVM IR to file so can be compiled
-      // by make command.
+      std::string outfile;
+      if (!ctx->output_file.empty()) {
+        outfile = ctx->output_file.replace_extension(".ll").string();
+      } else {
+        outfile = "./out.ll";
+      }
       std::error_code errorCode;
-      llvm::raw_fd_ostream outLLVMIR("out/test.ll", errorCode);
+      llvm::raw_fd_ostream outLLVMIR(outfile, errorCode);
       ctx->llvm_module.print(outLLVMIR, nullptr);
 
       return 0;

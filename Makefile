@@ -45,6 +45,6 @@ compile-llvm:
 	clang out/test.ll -o out/test.out; ./out/test.out; echo $$?
 
 clean:
-	rm -rf out/* *.trieste; rm -rf build; rm -rf out
+	rm -rf out/* *.trieste; rm -rf build; rm -rf out; rm out.ll; rm compiler_output.txt
 
 .PHONY: clean all build/miniml test

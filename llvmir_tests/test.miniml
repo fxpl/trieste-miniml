@@ -1,0 +1,91 @@
+(*42, 6, 7, 4, 24*)
+let f = fun f (x : int -> int) is x 2;;
+let ans = fun f (x:int):int is x + 40;;
+print (f(ans) = 42);;
+
+(*return fun, param fv*)
+let makeInc = fun f (x:int) is fun g (y:int) is x+y+1-1+1-1+1-1+1-1+1-1+1-1+1-1+1-1+1-1+1-1+1-1+1-1+1-1+1-1+1-1+1-1;;
+let inc5 = makeInc(5);;
+print((inc5 1) = 6);;
+
+(*duplicate param fv*)
+let makeInc2 = fun f (x:int) is fun g (y:int) is x+y+x-x;;
+let inc52 = makeInc2(5);;
+print((inc52 1) = 6);;
+
+(*let freevar*)
+let y = 6;;
+let incY = fun f (x:int):int is x + y;;
+print((incY 1) = 7);;
+
+(*let duplicate freevar*)
+let y = 6;;
+let incY = fun f (x:int):int is x + y + y;;
+print((incY 1) = 13);;
+
+(*copy fun*)
+let id = fun f (n:int) is n ;;
+let idcopy = id;;
+print((idcopy 4) = 4);;
+
+(*recursion*)
+let fact =
+  fun f (n:int) : int is
+    if n = 0 then 1 else n * f (n-1);;
+print((fact 4) = 24);;
+
+(*propagated freevars*)
+let z = 3;;
+let makeInc = fun f (x:int) is fun g (y:int) is x+y+z;;
+let inc1 = makeInc(1);;
+print((inc1 2) = 6);;
+
+let isEq = fun f (x:int) is
+            fun g (y:int) is
+             fun h (z:int) is
+                 if x = y then y = z else false ;;
+let right = isEq(1)(1)(1);;
+print(right);;
+let wrong = isEq(1)(2)(3);;
+print(wrong = false);;
+
+let sum = 1 + (if true then (if false then 3 else 4) else 5) + 6;;
+print((sum = 11));;
+
+(*internal fun name as freevar*)
+let div = fun div (x:int) is 
+    fun g (y:int) is
+        if x < y then
+            0
+        else
+            1 + div(x - y) y;;
+let ans = div(16)(3);;
+print((ans = 5));;
+
+(*signed comparison*)
+let isLessThan = fun f (x:int) is
+                    fun g (y:int) is x < y;;
+let ans = isLessThan(0-1)(1);;
+print((ans = true));;
+
+(*large environment*)
+let a = 1;;
+let b = 2;;
+let c = 3;;
+let d = 4;;
+let e = 5;;
+let f = 6;;
+let g = 7;;
+let h = 8;;
+let i = 9;;
+let j = 10;;
+let sum = fun y (x:int) is a+b+c+d+e+f+g+h+i+j+x;;
+let ans = sum(0);;
+print((ans = 55));;
+
+(*Application of CreateClosure*)
+(fun f_6 (t_4:int) is t_4 + ((8) + (t_4)))((fun f_7 (t_5:int) is t_5 + (85))(45));;
+
+(*Propagate free var across multiple scopes*)
+let fv = 2;;
+let f_0 = fun f (x:int) is x + ((fun g (y:int) is y + ((fun h (z:int) is z + fv)(54)))(1));;

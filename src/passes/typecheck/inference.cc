@@ -57,17 +57,17 @@ namespace miniml
                 },
             // Group constraints
             T(TopExpr) << (T(EqConstr, InstConstr)++[Constraints] * T(Let, Expr)[Expr]) >>
-                [](Match &_)
+                [](Match &_) -> Node
                 {
                   return TopExpr << (Constraints << _[Constraints])
                                  << _(Expr);
                 },
             In(TopExpr) * (T(Constraints)[Constraints] * (T(EqConstr, InstConstr) * T(EqConstr, InstConstr)++)[EqConstr]) >>
-                [](Match &_)
+                [](Match &_) -> Node
                 {
                   return (_(Constraints) << _[EqConstr]);
                 },
-            // Fuzz error 
+            // Fuzz error
             T(Type) << T(TNone)[TNone] >>
                 [](Match &_)
                 {
@@ -146,7 +146,7 @@ namespace miniml
                     : Seq << (lift_constraints({op_eqconstraint, eq_constraint(r_typ, int_type(), _(Expr))}))
                           << expr;
                 },
-            // Function definition 
+            // Function definition
             T(Expr) << (T(Fun)[Fun]
                         << (T(FunDef)[FunDef] << (T(Ident)[Ident] * (T(Type)[TypeArrow]) * T(Param)[Param] * (T(Expr)[Expr] << T(Type)[Type])))) >>
                 [](Match &_)
@@ -161,6 +161,14 @@ namespace miniml
                   auto expty_eq_retty = eq_constraint(exp_ty, ret_ty, _(Fun));
                   return Seq << lift_constraint(expty_eq_retty)
                              << (Expr << (Type << fun_ty->clone()) << _(Fun));
+                },
+            // Printing
+            T(Expr) << (T(Print)[Print]) >>
+                [](Match &_)
+                {
+                  auto tvar = fresh_tvar();
+                  auto print_ty = arrow_type(tvar, tvar);
+                  return Expr << (Type << print_ty) << _(Print);
                 },
             // Function application
             T(Expr)[Expr] << (T(App)[App]

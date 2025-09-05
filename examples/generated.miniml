@@ -1,0 +1,10 @@
+let t_0 = 17 - 72 + 38 * 24;;
+let t_1 = if ((8) < (79)) then (69) else (75) + 39 - 2;;
+let f_0 = fun f_1 (t_2:int) is t_2 + ((fun f_2 (t_3:int) is t_3 + t_2 * t_2)(t_2 + t_2));;
+let t_4 = 91 + t_1 - ((fun f_3 (t_5:int) is t_5 + t_0)(77));;
+let f_4 = fun f_5 (t_6:int) is t_6 + t_0 * t_0 * f_0(63);;
+let f_6 = fun f_7 (t_7:int) is t_7 + if ((64 - 44) < (53 + t_1)) then (if ((68) < (54)) then (34) else (99)) else (76 * 17);;
+let t_8 = f_4(t_1 - 83);;
+let f_8 = fun f_9 (t_9:int) is t_9 + if ((t_4) = (30)) then (52) else (t_9) * if ((54) < (t_1)) then (t_4) else (82);;
+let t_10 = if ((t_1) < (34)) then (t_1) else (t_8) - f_8(61);;
+f_8(t_8 - t_8);;

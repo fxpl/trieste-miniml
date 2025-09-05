@@ -1,12 +1,12 @@
 #pragma once
 #include <trieste/trieste.h>
 
-namespace miniml
-{
+namespace miniml {
   using namespace trieste;
 
   // Program
-  inline const auto Program = TokenDef("program", flag::symtab | flag::defbeforeuse);
+  inline const auto Program =
+    TokenDef("program", flag::symtab | flag::defbeforeuse);
   // Declarations
   inline const auto Let = TokenDef("let", flag::lookup);
 
@@ -20,7 +20,7 @@ namespace miniml
   // Constructed types
   inline const auto TVars = TokenDef("t_vars");
   inline const auto ForAllTy = TokenDef("forall");
-  //Constraints
+  // Constraints
   inline const auto EqConstr = TokenDef("eq_constraint");
   inline const auto InstConstr = TokenDef("inst_constraint");
   inline const auto GenConstr = TokenDef("gen_constraint");
@@ -36,7 +36,7 @@ namespace miniml
   inline const auto True = TokenDef("true");
   inline const auto False = TokenDef("false");
 
-   // Arithmetic operators
+  // Arithmetic operators
 
   inline const auto Add = TokenDef("+");
   inline const auto Sub = TokenDef("-");
@@ -47,11 +47,12 @@ namespace miniml
   inline const auto Equals = TokenDef("=");
 
   // Functions
-  inline const auto Fun  = TokenDef("fun", flag::symtab); //binds its argument to its symtab
+  inline const auto Fun = TokenDef(
+    "fun", flag::symtab); // binds its argument to its symtab
   inline const auto FunDef = TokenDef("fundef", flag::lookup | flag::shadowing);
   inline const auto Param = TokenDef("param", flag::lookup | flag::shadowing);
   inline const auto Annotation = TokenDef("t_annotation");
-  inline const auto Is  = TokenDef("is");
+  inline const auto Is = TokenDef("is");
 
   // Conditionals
   inline const auto If = TokenDef("if");
@@ -62,8 +63,12 @@ namespace miniml
   // Identifiers
   inline const auto Ident = TokenDef("ident", flag::print);
 
+  // Printing
+  inline const auto Print = TokenDef("print");
+
   // Grouping tokens
-  inline const auto TopExpr = TokenDef("topexpr"); // expressions/let decl at top level
+  inline const auto TopExpr =
+    TokenDef("topexpr"); // expressions/let decl at top level
   inline const auto Expr = TokenDef("expr");
   inline const auto App = TokenDef("app"); // function application
 
@@ -84,6 +89,26 @@ namespace miniml
   inline const auto Ty21 = TokenDef("ty21");
   inline const auto Ty22 = TokenDef("ty22");
   inline const auto Constr = TokenDef("constraint");
+  inline const auto Result = TokenDef("result");
 
-
+  /**
+   * Compilation to LLVM IR
+   */
+  inline const auto Compile = TokenDef("compile");
+  inline const auto PropagateCompile = TokenDef("propagate_compile");
+ 
+  // Closure implementation
+  inline const auto IRProgram = TokenDef("ir_program");
+  inline const auto IRFun = TokenDef("ir_function", flag::print | flag::symtab);
+  inline const auto Env = TokenDef("env", flag::print);
+  inline const auto ParamList = TokenDef("param_list");
+  inline const auto CreateClosure = TokenDef("create_closure", flag::print);
+  inline const auto ClosureCall = TokenDef("closure_call");
+  inline const auto FunCall = TokenDef("fun_call");
+  inline const auto Body = TokenDef("body");
+  inline const auto FreeVarList = TokenDef("free_var_list");
+  inline const auto FreeVar = TokenDef("free_variable");
+  inline const auto TPtr = TokenDef("pointer");
+  
+  inline const auto Global = TokenDef("global", flag::print);
 }

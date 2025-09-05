@@ -10,7 +10,7 @@ PassDef wrap_exprs(){
       parse::wf_let,
       dir::bottomup,
       {
-      In(Expr) * ((T(Ident,Int,True,False,Fun,If)[Ident] * --End)
+      In(Expr) * ((T(Ident,Int,True,False,Fun,If,Print)[Ident] * --End)
               / (--Start * T(Ident,Int,True,False,Fun,If)[Ident])) >>
           [](Match& _){
             return Expr << _(Ident);
@@ -19,8 +19,8 @@ PassDef wrap_exprs(){
         [](Match& _){
           return Expr << _(Ident);
       },
-      --(In(Expr)) * ((T(Int,True,False,Fun,If)[Expr] * --End)
-                   / (--Start * T(Int,True,False,Fun,If)[Expr])) >>
+      --(In(Expr)) * ((T(Int,True,False,Fun,If,Print)[Expr] * --End)
+                   / (--Start * T(Int,True,False,Fun,If,Print)[Expr])) >>
         [](Match& _){
           return Expr << _(Expr);
         }

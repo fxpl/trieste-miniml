@@ -1,16 +1,18 @@
 #pragma once
+#include "../llvm-lang.hh"
 #include "../miniml-lang.hh"
 
+// clang-format off
 namespace miniml{
  using namespace trieste;
 
-    std::vector<Pass> passes();
+    std::vector<Pass> passes(std::string input_filepath, std::string output_filepath);
     Parse parser();
 
     inline const auto wf_types = TInt | TBool | TVar | TypeArrow ;
     inline const auto wf_expr = Int | True | False
     | Add | Sub | Mul | LT | Equals
-    | If | Ident | Fun | App ;
+    | If | Ident | Fun | App | Print;
 
     namespace init_parse{
 
@@ -21,6 +23,7 @@ namespace miniml{
      If | Then | Else |
      Ident | Fun | Is | Let |
      Colon | Paren |
+     Print |
      wf_types
      ;
 
@@ -170,11 +173,58 @@ namespace miniml{
     | (Type <<= (Type >>= wf_types | ForAllTy))
     | (ForAllTy <<= TVars * Type)
     | (TVars <<= TVar++)
-    | (Let <<= Ident * Type * Expr)
+    | (Let <<= Ident * Type * Expr)[Ident]
     | (Expr <<= Type * (Expr >>= wf_expr))
-    | (Param <<= Ident * Type)
-    | (FunDef <<= Ident * Type * Param * Expr)
+    | (Param <<= Ident * Type)[Ident]
+    | (FunDef <<= Ident * Type * Param * Expr)[Ident]
     ;
 
     }
+
+    namespace closures{
+    
+      inline const auto wf_freeVars = 
+        check::wf
+        | (FunDef <<= Ident * Type * Param * FreeVarList * Expr)[Ident]
+          | (FreeVarList <<= FreeVar++)
+            | (FreeVar <<= Ident * Type)
+        | (Expr <<= Type * (Expr >>= (wf_expr | Global)))
+        ;
+
+      inline const auto wf_functions =
+        wf_freeVars
+        | (Top <<= IRProgram)
+        | (IRProgram <<= IRFun++)
+        | (IRFun <<= Type * ParamList * Env * FreeVarList * Body)
+        | (ParamList <<= Param++)
+        | (Body <<= TopExpr++)
+        ;
+
+      inline const auto wf_closures =
+        wf_functions
+        | (IRProgram <<= (Env | IRFun)++[1])
+        | (Env <<= Type++)
+        | (Body <<= (TopExpr | Expr)++)
+        | (TopExpr <<= (Let | Expr))
+        | (Expr <<= Type * (Expr >>= ((wf_expr - App) | Global | CreateClosure | ClosureCall | FunCall)))
+          | (CreateClosure <<= (Fun >>= Ident) * Env * FreeVarList)
+          | (FunCall <<= (Fun >>= Expr) * (Param >>= Expr))
+          | (ClosureCall <<= (Fun >>= Expr) * (Param >>= Expr))
+        | (Type <<= (Type >>= wf_types | ForAllTy | TPtr))
+        ;
+
+      inline const auto wf =
+        wf_closures
+        | (FreeVar <<= (Ident >>= (Ident | Global)) * Type)
+        ;
+    }
+
+    namespace LLVMIRCompilation{
+
+      inline const auto wf = 
+      llvmir::wf - llvmir::Block
+      | (llvmir::Body <<= (llvmir::Label | llvmir::Action | llvmir::Instr | llvmir::TerminatorOp)++[1])
+      ;
+    }
 }
+// clang-format on

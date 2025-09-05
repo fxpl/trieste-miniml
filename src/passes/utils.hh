@@ -1,22 +1,21 @@
 #pragma once
 #include "../miniml-lang.hh"
 
-namespace miniml
-{
+namespace miniml {
   using namespace ::trieste;
   using Subst = std::map<std::string, Node>;
 
-  //a few helper patterns
-  inline const auto expr_binOp = T(Mul,Add,Sub,Equals,LT);
-  inline const auto expr_keywords = T(If,Then,Else);
-  inline const auto expr_const = T(Int,True,False);
-  inline const auto type = T(TInt,TBool,TVar,TypeArrow);
+  // a few helper patterns
+  inline const auto expr_binOp = T(Mul, Add, Sub, Equals, LT);
+  inline const auto expr_keywords = T(If, Then, Else);
+  inline const auto expr_const = T(Int, True, False);
+  inline const auto type = T(TInt, TBool, TVar, TypeArrow);
 
-  Node err(const NodeRange &r, const std::string &msg);
+  Node err(const NodeRange& r, const std::string& msg);
 
-  Node err(Node node, const std::string &msg);
+  Node err(Node node, const std::string& msg);
 
-    std::string node_val(Node node);
+  std::string node_val(Node node);
 
   Node get_type(Node n);
 
@@ -44,7 +43,6 @@ namespace miniml
   Node inst_constraint(Node ty1, Node ty2, Node origin);
   Node gen_constraint(Node ty1, Node ty2, Node origin);
 
-
   Node lift_constraint(Node n);
 
   Node lift_constraints(std::vector<Node> nodes);
@@ -58,5 +56,19 @@ namespace miniml
   Node generalize(Node ty1);
 
   Node instantiate(Node ty);
+
+  /**
+   * Pops and returns the first child of a Node.
+   * @param node parent node to pop first child of.
+   * @return the first child node.
+   */
+  Node pop_front(Node type);
+
+  /**
+   * Converts a miniML type token to an LLVM IR type token.
+   * @param type The miniML type token to convert.
+   * @return The LLVM IR type token.
+   */
+  Node getLLVMType(Node type);
 
 }

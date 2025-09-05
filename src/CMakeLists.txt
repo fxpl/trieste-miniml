@@ -7,7 +7,7 @@ include(FetchContent)
 FetchContent_Declare(
   trieste
   GIT_REPOSITORY https://github.com/microsoft/Trieste
-  GIT_TAG main
+  GIT_TAG 9bc9c7b1c8cd01b118bfe23b604d56adde2c4863
   )
 
 FetchContent_MakeAvailable(trieste)

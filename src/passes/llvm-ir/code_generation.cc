@@ -590,7 +590,7 @@ namespace llvmir {
             llvm::Type* type = ctx->types[typeId];
             assert(type);
 
-            auto dl = llvm::DataLayout(&ctx->llvm_module);
+            auto dl = llvm::DataLayout(ctx->llvm_module.getDataLayout());
             auto typeSize = dl.getTypeStoreSize(type);
 
             llvm::Value* value = nullptr;

@@ -8,20 +8,36 @@ The frontend for MiniML as defined by https://plzoo.andrej.com/language/miniml.h
 
 To build using make (note that you still need to have ninja installed for this to work):
 ```
-make
-```
+make build
+``` 
 
 otherwise, do 
 
 ```
 mkdir build && cd build
 cmake -G Ninja ../src -DCMAKE_CXX_COMPILER=clang++
-ninja
+# You can also provide the path to a specific c++ compiler, e.g. /usr/bin/clang++
+
+# To run with llvm-cov for code coverage 
+make build coverage=ON clang_path=your_path_to_llvm_clang 
+ninja 
 ```
 
 to run main on a file filename located in the `/examples/` folder:
 ```
 make buildf f=filename 
+```
+a corresponding .trieste file will be written to out/filename.trieste
+
+to build and run code coverage for a file located in the examples folder:
+```
+make build coverage=ON
+make coverage_report file=filename
+```
+which creates an html file that can be opened as
+
+```
+open build/index.html
 ```
 a corresponding `.trieste` file will be written to `out/filename.trieste` and the compiled `.ll` file will be written to `out/filename.ll`.
 

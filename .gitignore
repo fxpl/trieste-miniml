@@ -40,3 +40,6 @@ out
 .vscode/
 ../.DS_Store
 .DS_Store
+
+# Coverage files 
+cov_tmp/

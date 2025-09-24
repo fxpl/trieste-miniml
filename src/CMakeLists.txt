@@ -6,9 +6,10 @@ include(FetchContent)
 
 FetchContent_Declare(
   trieste
-  GIT_REPOSITORY https://github.com/microsoft/Trieste
-  GIT_TAG 9bc9c7b1c8cd01b118bfe23b604d56adde2c4863
-  )
+  SOURCE_DIR ../../Trieste # Local trieste path while waiting on PR merge
+  #GIT_REPOSITORY https://github.com/microsoft/Trieste 
+  GIT_TAG main
+  )  
 
 FetchContent_MakeAvailable(trieste)
 
@@ -39,6 +40,16 @@ target_link_libraries(miniml
   trieste::trieste
   ${llvm_libs}
 )
+
+option(CODE_COVERAGE "Enable coverage reporting" ON)
+
+if(CODE_COVERAGE)
+   message(STATUS "Code coverage enabled")
+   set(COVERAGE_FLAGS "-fprofile-instr-generate -fcoverage-mapping -O0 -g")
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${COVERAGE_FLAGS}")
+   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${COVERAGE_FLAGS}")
+   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${COVERAGE_FLAGS}")
+endif()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)

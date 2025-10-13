@@ -230,7 +230,7 @@ namespace miniml {
     } else if (type == TPtr) {
       return llvmir::TPtr;
     } else {
-      return nullptr;
+      return err(type, "no equivalent LLVM IR type");
     }
   }
 

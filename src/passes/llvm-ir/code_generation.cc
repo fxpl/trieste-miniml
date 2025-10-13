@@ -562,15 +562,23 @@ namespace llvmir {
             std::string regId = node_val(_(Ident));
             std::string valueStr = node_val(_(IRValue));
 
-            Value* value = NULL;
-            if (_(Type) == Ti1) {
-              value = ctx->builder.getInt1(std::stoi(valueStr));
-            } else if (_(Type) == Ti32) {
-              value = ctx->builder.getInt32(std::stoi(valueStr));
-            } else if (_(Type) == Ti64) {
-              value = ctx->builder.getInt64(std::stoi(valueStr));
+            Value* value;
+            try {
+              value = (_(Type) == Ti1) ?
+                ctx->builder.getInt1(std::stoi(valueStr)) :
+                (_(Type) == Ti32) ? ctx->builder.getInt32(std::stoi(valueStr)) :
+                (_(Type) == Ti64) ? ctx->builder.getInt64(std::stoi(valueStr)) :
+                                    nullptr;
+            } catch (const std::invalid_argument& ia) {
+              return miniml::err(_(IRValue), "CreateConst - invalid integer value");
+            } catch (const std::out_of_range& oor) {
+              return miniml::err(
+                _(IRValue), "CreateConst - integer value out of range");
             }
-            assert(value);
+
+            if (!value) {
+              return miniml::err(_(Type), "CreateConst - unexpected type");
+            }
 
             ctx->registers[regId] = value;
 
@@ -657,6 +665,9 @@ namespace llvmir {
 
     pass.post([ctx](Node) {
       Function* main = ctx->llvm_module.getFunction("main");
+      if(!main) {
+        throw std::runtime_error("Program does not have a 'main' function.");
+      }
       verifyFunction(*main, &llvm::errs());
       verifyModule(ctx->llvm_module, &llvm::errs());
 
@@ -677,5 +688,4 @@ namespace llvmir {
 
     return pass;
   }
-
 }

@@ -76,6 +76,10 @@ namespace miniml {
           Node let = _(Let);
           Node ident = let / Ident;
           Node expr = let / Expr;
+
+          if (get_type(let) != ForAllTy) {
+            return err(let, "let declaration is not polymorphic");
+          }
           Node type = get_type(get_type(let));
 
           Node llvmType = getLLVMType(type);
@@ -103,16 +107,11 @@ namespace miniml {
                  T(True, False)[TBool]) >>
           [](Match& _) -> Node {
           Node irValue = _(TBool);
-          Node value = NULL;
-          if (irValue == True) {
-            value = llvmir::IRValue ^ "1";
-          } else if (irValue == False) {
-            value = llvmir::IRValue ^ "0";
-          }
-          assert(value);
+          Node value = irValue == True? llvmir::IRValue ^ "1":
+                       irValue == False? llvmir::IRValue ^ "0":
+                       err(irValue, "malformed boolean constant");
 
           Node llvmType = getLLVMType(_(Type));
-          assert(llvmType);
 
           return llvmir::Action
             << (llvmir::CreateConst << _(Result) << llvmType << value);
@@ -127,7 +126,6 @@ namespace miniml {
           Node value = llvmir::IRValue ^ node_val(_(Int));
 
           Node llvmType = getLLVMType(_(Type));
-          assert(llvmType);
 
           return llvmir::Action
             << (llvmir::CreateConst << _(Result) << llvmType << value);
@@ -141,7 +139,6 @@ namespace miniml {
                 (T(Expr) << (T(Type)[Type] * T(Ident)[Ident]))) >>
           [context](Match& _) -> Node {
           auto llvmType = getLLVMType(_(Type) / Type);
-          assert(llvmType);
 
           Node irIdent = llvmir::Ident ^ node_val(_(Ident));
 
@@ -158,7 +155,6 @@ namespace miniml {
                 (T(Expr) << (T(Type)[Type] * T(Global)[Global]))) >>
           [context](Match& _) -> Node {
           auto llvmType = getLLVMType(_(Type) / Type);
-          assert(llvmType);
 
           return llvmir::Instr
             << (llvmir::MemoryOp
@@ -177,18 +173,12 @@ namespace miniml {
           Node lhs = binop / Lhs;
           Node rhs = binop / Rhs;
 
-          Node op = NULL;
-          if (binop == Add) {
-            op = llvmir::Add;
-          } else if (binop == Sub) {
-            op = llvmir::Sub;
-          } else if (binop == Mul) {
-            op = llvmir::Mul;
-          }
-          assert(op);
+          Node op = binop == Add ? llvmir::Add
+                  : binop == Sub ? llvmir::Sub
+                  : binop == Mul ? llvmir::Mul
+                  : err(binop, "malformed binary operator");
 
           Node llvmType = getLLVMType(_(Type) / Type);
-          assert(llvmType);
 
           Node lhsId = llvmir::Ident ^ lhs->fresh();
           Node rhsId = llvmir::Ident ^ rhs->fresh();
@@ -250,11 +240,10 @@ namespace miniml {
                  (T(If) << T(Expr)[Cond] * T(Expr)[True] * T(Expr)[False])) >>
           [](Match& _) -> Node {
           Node type = get_type(_(Expr));
-          Node llvmType = getLLVMType(type);
           if (type == nullptr) {
             return err(_(Type), "if-then-else type not supported");
           }
-          assert(llvmType);
+          Node llvmType = getLLVMType(type);
 
           Node condId = llvmir::Ident ^ _(Cond)->fresh();
           Node ifTrueId = llvmir::Ident ^ _(True)->fresh();
@@ -342,9 +331,7 @@ namespace miniml {
           Node funRetType = typeArrow / Ty2;
 
           Node argLLVMType = getLLVMType(funArgType);
-          assert(argLLVMType);
           Node retLLVMType = getLLVMType(funRetType);
-          assert(retLLVMType);
 
           std::string uniqueId = std::string(fun->fresh().view());
           Node closurePtr = llvmir::Ident ^ "closPtr_" + uniqueId;
@@ -455,9 +442,7 @@ namespace miniml {
             return err(type, "function type is not a function type");
           }
           Node paramType = getLLVMType(type / Ty1);
-          assert(paramType);
           Node returnType = getLLVMType(type / Ty2);
-          assert(returnType);
 
           Node funType = llvmir::TypeArrow << paramType << returnType;
 
@@ -491,6 +476,9 @@ namespace miniml {
             Node env = fun / Env;
 
             Node envType = llvmir::Ident ^ node_val(env);
+            if (paramList->size() < 2) {
+              return err(paramList, "too few parameters to function");
+            }
             Node envPtr = llvmir::Ident ^ node_val((paramList->at(1) / Ident));
             Node loadFreeVarsFromEnv =
               (Compile << envType->clone() << envPtr->clone() << freeVarList
@@ -683,7 +671,6 @@ namespace miniml {
 
           Node type = get_type(param);
           Node llvmType = getLLVMType(type);
-          assert(llvmType);
 
           return llvmir::Param << irIdent << llvmType;
         },

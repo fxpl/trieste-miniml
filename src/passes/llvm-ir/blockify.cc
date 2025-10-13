@@ -29,15 +29,17 @@ namespace miniml {
               block = llvmir::Block ^ node_val(child);
               block->push_back(child);
               statements = llvmir::Statements;
-            } else if (child == llvmir::TerminatorOp) {
+            } else if (block && child == llvmir::TerminatorOp) {
               block->push_back(statements);
               block->push_back(llvmir::Terminator << child);
               blockifiedBody->push_back(block);
 
               block = nullptr;
               statements = nullptr;
-            } else {
+            } else if (block) {
               statements->push_back(child);
+            } else {
+              return err(child, "Instruction or terminator outside of block");
             }
           }
 

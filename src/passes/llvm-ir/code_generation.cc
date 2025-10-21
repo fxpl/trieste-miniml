@@ -733,6 +733,7 @@ namespace llvmir {
         }};
 
     pass.pre([ctx](Node) {
+      ctx->reset();
       genExternalFunctions(ctx);
       genRuntimeFunctions(ctx);
 

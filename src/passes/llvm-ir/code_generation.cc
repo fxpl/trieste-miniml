@@ -25,7 +25,9 @@ namespace llvmir {
    */
   PassDef
   code_generation(std::string input_filepath, std::string output_filepath) {
-    auto ctx = std::make_shared<LLVMIRContext>(input_filepath, output_filepath);
+    auto ctx = std::make_shared<std::shared_ptr<LLVMIRContext>>(std::make_shared<LLVMIRContext>(input_filepath, output_filepath));
+    auto in_file = std::make_shared<std::string>(input_filepath);
+    auto out_file = std::make_shared<std::string>(output_filepath);
 
     /**
      * Bottom up pass that "recursively" generates LLVM IR.
@@ -52,28 +54,28 @@ namespace llvmir {
                         T(Ident)[Lhs] * T(Ident)[Rhs])) >>
             [ctx](Match& _) -> Node {
             std::string lhsId = node_val(_(Lhs));
-            Value* lhs = ctx->registers[lhsId];
+            Value* lhs = (*ctx)->registers[lhsId];
             if (!lhs) {
               return miniml::err(_(Lhs), "undefined variable");
             }
 
             std::string rhsId = node_val(_(Rhs));
-            Value* rhs = ctx->registers[rhsId];
+            Value* rhs = (*ctx)->registers[rhsId];
             if (!rhs) {
               return miniml::err(_(Rhs), "undefined variable");
             }
 
             std::string resultId = node_val(_(Ident));
             Value* result = (_(Op) == Add) ?
-              ctx->builder.CreateAdd(lhs, rhs, resultId) :
-              (_(Op) == Sub) ? ctx->builder.CreateSub(lhs, rhs, resultId) :
-              (_(Op) == Mul) ? ctx->builder.CreateMul(lhs, rhs, resultId) :
+              (*ctx)->builder.CreateAdd(lhs, rhs, resultId) :
+              (_(Op) == Sub) ? (*ctx)->builder.CreateSub(lhs, rhs, resultId) :
+              (_(Op) == Mul) ? (*ctx)->builder.CreateMul(lhs, rhs, resultId) :
                                nullptr;
             if (!result) {
               return miniml::err(_(Op), "unsupported binary operator");
             }
 
-            ctx->registers[resultId] = result;
+            (*ctx)->registers[resultId] = result;
 
             return NoChange;
           },
@@ -89,15 +91,15 @@ namespace llvmir {
             [ctx](Match& _) -> Node {
             std::string resultId = node_val(_(Ident));
 
-            llvm::Type* llvmType = createLLVMType(ctx, _(Type));
+            llvm::Type* llvmType = createLLVMType(*ctx, _(Type));
             if (!llvmType) {
               return miniml::err(_(Type), "Alloca - invalid LLVM type");
             }
 
             AllocaInst* result =
-              ctx->builder.CreateAlloca(llvmType, nullptr, resultId);
+              (*ctx)->builder.CreateAlloca(llvmType, nullptr, resultId);
 
-            ctx->registers[resultId] = result;
+            (*ctx)->registers[resultId] = result;
 
             return NoChange;
           },
@@ -108,18 +110,18 @@ namespace llvmir {
                   << (T(Store) << T(Ident)[IRValue] * T(Ident)[Dst])) >>
             [ctx](Match& _) -> Node {
             std::string valueId = node_val(_(IRValue));
-            Value* value = ctx->registers[valueId];
+            Value* value = (*ctx)->registers[valueId];
             if (!value) {
               return miniml::err(_(IRValue), "Store - undefined value");
             }
 
             std::string destId = node_val(_(Dst));
-            Value* dest = ctx->registers[destId];
+            Value* dest = (*ctx)->registers[destId];
             if (!dest) {
               return miniml::err(_(Dst), "Store - undefined destination");
             }
 
-            ctx->builder.CreateStore(value, dest);
+            (*ctx)->builder.CreateStore(value, dest);
 
             return NoChange;
           },
@@ -132,19 +134,19 @@ namespace llvmir {
             [ctx](Match& _) -> Node {
             std::string resultId = node_val(_(Ident));
 
-            llvm::Type* type = createLLVMType(ctx, _(Type));
+            llvm::Type* type = createLLVMType(*ctx, _(Type));
             if (!type) {
               return miniml::err(_(Type), "Load - invalid LLVM type");
             }
 
-            Value* src = ctx->registers[node_val(_(Src))];
+            Value* src = (*ctx)->registers[node_val(_(Src))];
             if (!src) {
               return miniml::err(_(Src), "Load - undefined source");
             }
 
-            Value* result = ctx->builder.CreateLoad(type, src, resultId);
+            Value* result = (*ctx)->builder.CreateLoad(type, src, resultId);
 
-            ctx->registers[resultId] = result;
+            (*ctx)->registers[resultId] = result;
 
             return NoChange;
           },
@@ -157,13 +159,13 @@ namespace llvmir {
                           T(Ident)[IRValue] * T(OffsetList)[OffsetList]))) >>
             [ctx](Match& _) -> Node {
             std::string valueId = node_val(_(IRValue));
-            Value* value = ctx->registers[valueId];
+            Value* value = (*ctx)->registers[valueId];
             if (!value) {
               return miniml::err(_(IRValue), "GEP - undefined value");
             }
 
             std::string typeId = node_val(_(IRType));
-            llvm::Type* type = ctx->types[typeId];
+            llvm::Type* type = (*ctx)->types[typeId];
             if (!type) {
               return miniml::err(_(IRType), "GEP - invalid type");
             }
@@ -175,7 +177,7 @@ namespace llvmir {
               Value* offset = nullptr;
               if (offsetType == Ti32) {
                 int offsetValue = stoi(valStr);
-                offset = ctx->builder.getInt32(offsetValue);
+                offset = (*ctx)->builder.getInt32(offsetValue);
               }
               if (!offset) {
                 return miniml::err(offsetNode, "GEP - unexpected offset type");
@@ -186,8 +188,8 @@ namespace llvmir {
 
             std::string resultId = node_val(_(Result));
             Value* result =
-              ctx->builder.CreateGEP(type, value, offsets, resultId);
-            ctx->registers[resultId] = result;
+              (*ctx)->builder.CreateGEP(type, value, offsets, resultId);
+            (*ctx)->registers[resultId] = result;
 
             return NoChange;
           },
@@ -202,10 +204,10 @@ namespace llvmir {
                         T(ArgList)[ArgList])) >>
             [ctx](Match& _) -> Node {
             std::string funId = node_val(_(Fun));
-            Function* function = ctx->llvm_module.getFunction(funId);
+            Function* function = (*ctx)->llvm_module.getFunction(funId);
 
             if (function == nullptr) {
-              function = (Function*)ctx->registers[funId];
+              function = (Function*)(*ctx)->registers[funId];
             }
             if (!function) {
               return miniml::err(_(Fun), "Call - undefined function");
@@ -214,7 +216,7 @@ namespace llvmir {
             std::vector<llvm::Value*> arguments;
             for (Node arg : *_(ArgList)) {
               std::string argId = node_val(arg);
-              Value* argVal = ctx->registers[argId];
+              Value* argVal = (*ctx)->registers[argId];
               if (!argVal) {
                 return miniml::err(arg, "Call - undefined argument value");
               }
@@ -224,9 +226,9 @@ namespace llvmir {
 
             std::string resultId = node_val(_(Result));
             Value* result =
-              ctx->builder.CreateCall(function, arguments, resultId);
+              (*ctx)->builder.CreateCall(function, arguments, resultId);
 
-            ctx->registers[resultId] = result;
+            (*ctx)->registers[resultId] = result;
 
             return NoChange;
           },
@@ -239,14 +241,14 @@ namespace llvmir {
             [ctx](Match& _) -> Node {
             std::string funTyId = node_val(_(IRType));
             llvm::FunctionType* funTy =
-              (llvm::FunctionType*)ctx->types[funTyId];
+              (llvm::FunctionType*)(*ctx)->types[funTyId];
             if (!funTy) {
               return miniml::err(
                 _(IRType), "CallOpaque - invalid function type");
             }
 
             std::string funId = node_val(_(Fun));
-            llvm::Value* functionPtr = ctx->registers[funId];
+            llvm::Value* functionPtr = (*ctx)->registers[funId];
             if (!functionPtr) {
               return miniml::err(
                 _(Fun), "CallOpaque - undefined function pointer");
@@ -255,7 +257,7 @@ namespace llvmir {
             std::vector<llvm::Value*> arguments;
             for (Node arg : *_(ArgList)) {
               std::string argId = node_val(arg);
-              Value* argVal = ctx->registers[argId];
+              Value* argVal = (*ctx)->registers[argId];
               if (!argVal) {
                 return miniml::err(
                   arg, "CallOpaque - undefined argument value");
@@ -266,9 +268,9 @@ namespace llvmir {
 
             std::string resultId = node_val(_(Result));
             Value* result =
-              ctx->builder.CreateCall(funTy, functionPtr, arguments, resultId);
+              (*ctx)->builder.CreateCall(funTy, functionPtr, arguments, resultId);
 
-            ctx->registers[resultId] = result;
+            (*ctx)->registers[resultId] = result;
 
             return NoChange;
           },
@@ -280,13 +282,13 @@ namespace llvmir {
                         T(Ti32, Ti1)[Type] * T(Ident)[Lhs] * T(Ident)[Rhs])) >>
             [ctx](Match& _) -> Node {
             std::string lhsId = node_val(_(Lhs));
-            Value* lhs = ctx->registers[lhsId];
+            Value* lhs = (*ctx)->registers[lhsId];
             if (!lhs) {
               return miniml::err(_(Lhs), "Icmp - undefined lhs");
             }
 
             std::string rhsId = node_val(_(Rhs));
-            Value* rhs = ctx->registers[rhsId];
+            Value* rhs = (*ctx)->registers[rhsId];
             if (!rhs) {
               return miniml::err(_(Rhs), "Icmp - undefined rhs");
             }
@@ -296,18 +298,18 @@ namespace llvmir {
             Value* result = NULL;
             Node op = _(Op);
             if (op == EQ) {
-              result = ctx->builder.CreateICmpEQ(lhs, rhs, resultId);
+              result = (*ctx)->builder.CreateICmpEQ(lhs, rhs, resultId);
             } else if (op == ULT) {
-              result = ctx->builder.CreateICmpULT(lhs, rhs, resultId);
+              result = (*ctx)->builder.CreateICmpULT(lhs, rhs, resultId);
             } else if (op == SLT) {
-              result = ctx->builder.CreateICmpSLT(lhs, rhs, resultId);
+              result = (*ctx)->builder.CreateICmpSLT(lhs, rhs, resultId);
             }
             if (!result) {
               return miniml::err(
                 _(Op), "Icmp - unexpected comparison operator");
             }
 
-            ctx->registers[resultId] = result;
+            (*ctx)->registers[resultId] = result;
 
             return NoChange;
           },
@@ -321,44 +323,44 @@ namespace llvmir {
             [ctx](Match& _) -> Node {
             llvm::Type* type = NULL;
             if (_(Type) == Ti32) {
-              type = ctx->builder.getInt32Ty();
+              type = (*ctx)->builder.getInt32Ty();
             } else if (_(Type) == Ti1) {
-              type = ctx->builder.getInt1Ty();
+              type = (*ctx)->builder.getInt1Ty();
             }
             if (!type) {
               return miniml::err(_(Type), "Phi - invalid type");
             }
 
             std::string ifTrueId = node_val(_(True) / IRValue);
-            Value* trueVal = ctx->registers[ifTrueId];
+            Value* trueVal = (*ctx)->registers[ifTrueId];
             if (!trueVal) {
               return miniml::err(_(True), "Phi - undefined true value");
             }
 
             std::string trueLabel = node_val(_(True) / Label);
-            BasicBlock* trueBlock = ctx->basicBlocks[trueLabel];
+            BasicBlock* trueBlock = (*ctx)->basicBlocks[trueLabel];
             if (!trueBlock) {
               return miniml::err(_(True), "Phi - undefined true block");
             }
 
             std::string falseId = node_val(_(False) / IRValue);
-            Value* falseVal = ctx->registers[falseId];
+            Value* falseVal = (*ctx)->registers[falseId];
             if (!falseVal) {
               return miniml::err(_(False), "Phi - undefined false value");
             }
 
             std::string falseLabel = node_val(_(False) / Label);
-            BasicBlock* falseBlock = ctx->basicBlocks[falseLabel];
+            BasicBlock* falseBlock = (*ctx)->basicBlocks[falseLabel];
             if (!falseBlock) {
               return miniml::err(_(False), "Phi - undefined false block");
             }
 
             std::string resultId = node_val(_(Ident));
-            PHINode* phi = ctx->builder.CreatePHI(type, 2, resultId);
+            PHINode* phi = (*ctx)->builder.CreatePHI(type, 2, resultId);
             phi->addIncoming(trueVal, trueBlock);
             phi->addIncoming(falseVal, falseBlock);
 
-            ctx->registers[resultId] = phi;
+            (*ctx)->registers[resultId] = phi;
 
             return NoChange;
           },
@@ -368,12 +370,12 @@ namespace llvmir {
             std::string funId = node_val(_(Label)->parent(IRFun));
             std::string blockId = node_val(_(Label));
 
-            llvm::BasicBlock* block = ctx->basicBlocks[blockId];
+            llvm::BasicBlock* block = (*ctx)->basicBlocks[blockId];
             if (!block) {
               return miniml::err(_(Label), "Label - undefined block");
             }
 
-            ctx->builder.SetInsertPoint(block);
+            (*ctx)->builder.SetInsertPoint(block);
 
             return NoChange;
           },
@@ -387,24 +389,24 @@ namespace llvmir {
                   << (T(Ident)[Cond] * T(Label)[True] * T(Label)[False])) >>
             [ctx](Match& _) -> Node {
             std::string condId = node_val(_(Cond));
-            Value* cond = ctx->registers[condId];
+            Value* cond = (*ctx)->registers[condId];
             if (!cond) {
               return miniml::err(_(Cond), "Branch - undefined condition");
             }
 
             std::string trueId = node_val(_(True));
-            llvm::BasicBlock* trueBlock = ctx->basicBlocks[trueId];
+            llvm::BasicBlock* trueBlock = (*ctx)->basicBlocks[trueId];
             if (!trueBlock) {
               return miniml::err(_(True), "Branch - undefined true block");
             }
 
             std::string falseId = node_val(_(False));
-            llvm::BasicBlock* falseBlock = ctx->basicBlocks[falseId];
+            llvm::BasicBlock* falseBlock = (*ctx)->basicBlocks[falseId];
             if (!falseBlock) {
               return miniml::err(_(False), "Branch - undefined false block");
             }
 
-            ctx->builder.CreateCondBr(cond, trueBlock, falseBlock);
+            (*ctx)->builder.CreateCondBr(cond, trueBlock, falseBlock);
 
             return NoChange;
           },
@@ -413,12 +415,12 @@ namespace llvmir {
           T(TerminatorOp) << (T(Jump) << (T(Label)[Label])) >>
             [ctx](Match& _) -> Node {
             std::string blockId = node_val(_(Label));
-            llvm::BasicBlock* block = ctx->basicBlocks[blockId];
+            llvm::BasicBlock* block = (*ctx)->basicBlocks[blockId];
             if (!block) {
               return miniml::err(_(Label), "Jump - undefined block");
             }
 
-            ctx->builder.CreateBr(block);
+            (*ctx)->builder.CreateBr(block);
 
             return NoChange;
           },
@@ -427,12 +429,12 @@ namespace llvmir {
           T(TerminatorOp) << (T(Ret) << T(Ident)[Ident]) >>
             [ctx](Match& _) -> Node {
             std::string resultId = node_val(_(Ident));
-            Value* result = ctx->registers[resultId];
+            Value* result = (*ctx)->registers[resultId];
             if (!result) {
               return miniml::err(_(Ident), "Return - undefined result");
             }
 
-            ctx->builder.CreateRet(result);
+            (*ctx)->builder.CreateRet(result);
 
             return NoChange;
           },
@@ -447,21 +449,21 @@ namespace llvmir {
                         T(Ident)[IRType])) >>
             [ctx](Match& _) -> Node {
             std::string targetTypeId = node_val(_(IRType));
-            llvm::Type* targetType = ctx->types[targetTypeId];
+            llvm::Type* targetType = (*ctx)->types[targetTypeId];
             if (!targetType) {
               return miniml::err(_(IRType), "BitCast - invalid target type");
             }
 
             std::string valueToConvertId = node_val(_(IRValue));
-            Value* valueToConvert = ctx->registers[valueToConvertId];
+            Value* valueToConvert = (*ctx)->registers[valueToConvertId];
             if (!valueToConvert) {
               return miniml::err(_(IRValue), "BitCast - undefined value to convert");
             }
 
             std::string resultId = node_val(_(Result));
             Value* result =
-              ctx->builder.CreateBitCast(valueToConvert, targetType, resultId);
-            ctx->registers[resultId] = result;
+              (*ctx)->builder.CreateBitCast(valueToConvert, targetType, resultId);
+            (*ctx)->registers[resultId] = result;
 
             return NoChange;
           },
@@ -472,21 +474,21 @@ namespace llvmir {
                   << (T(BitCast) << T(Ident)[Result] * T(Ident)[IRValue] *
                         T(Ti1, Ti32, Ti64, TPtr)[IRType])) >>
             [ctx](Match& _) -> Node {
-            llvm::Type* targetType = createLLVMType(ctx, _(IRType));
+            llvm::Type* targetType = createLLVMType(*ctx, _(IRType));
             if (!targetType) {
               return miniml::err(_(IRType), "BitCast - invalid target type");
             }
 
             std::string valueToConvertId = node_val(_(IRValue));
-            Value* valueToConvert = ctx->registers[valueToConvertId];
+            Value* valueToConvert = (*ctx)->registers[valueToConvertId];
             if (!valueToConvert) {
               return miniml::err(_(IRValue), "BitCast - undefined value to convert");
             }
 
             std::string resultId = node_val(_(Result));
             Value* result =
-              ctx->builder.CreateBitCast(valueToConvert, targetType, resultId);
-            ctx->registers[resultId] = result;
+              (*ctx)->builder.CreateBitCast(valueToConvert, targetType, resultId);
+            (*ctx)->registers[resultId] = result;
 
             return NoChange;
           },
@@ -498,7 +500,7 @@ namespace llvmir {
                 T(Body) >>
             [ctx](Match& _) -> Node {
             Node returnType = _(TypeArrow) / Ty2;
-            llvm::Type* returnLLVMType = createLLVMType(ctx, returnType);
+            llvm::Type* returnLLVMType = createLLVMType(*ctx, returnType);
             if (!returnLLVMType) {
               return miniml::err(
                 returnType, "FunctionDecl - invalid return type");
@@ -508,7 +510,7 @@ namespace llvmir {
 
             for (Node param : *_(ParamList)) {
               Node type = param / Type;
-              llvm::Type* llvmType = createLLVMType(ctx, type);
+              llvm::Type* llvmType = createLLVMType(*ctx, type);
               if (!llvmType) {
                 return miniml::err(
                   type, "FunctionDecl - invalid parameter type");
@@ -534,9 +536,9 @@ namespace llvmir {
               theFunctionType,
               Function::LinkageTypes::ExternalLinkage,
               theFunctionName,
-              ctx->llvm_module);
+              (*ctx)->llvm_module);
             theFunction->setCallingConv(CallingConv::C);
-            ctx->registers[theFunctionName] = theFunction;
+            (*ctx)->registers[theFunctionName] = theFunction;
 
             return NoChange;
           },
@@ -548,7 +550,7 @@ namespace llvmir {
           T(Action) << (T(GetType) << T(Ident)[Result] * T(Ident)[IRType]) >>
             [ctx](Match& _) -> Node {
             std::string valueId = node_val(_(IRType));
-            llvm::Value* value = ctx->registers[valueId];
+            llvm::Value* value = (*ctx)->registers[valueId];
             if (!value) {
               return miniml::err(_(IRType), "GetType - undefined value");
             }
@@ -556,7 +558,7 @@ namespace llvmir {
             llvm::Type* destType = value->getType();
 
             std::string resultId = node_val(_(Result));
-            ctx->types[resultId] = destType;
+            (*ctx)->types[resultId] = destType;
 
             return NoChange;
           },
@@ -566,12 +568,12 @@ namespace llvmir {
             [ctx](Match& _) -> Node {
             std::string tmpIdent = node_val(_(Result));
             std::string functionName = node_val(_(Fun));
-            Function* theFunction = ctx->llvm_module.getFunction(functionName);
+            Function* theFunction = (*ctx)->llvm_module.getFunction(functionName);
             if (!theFunction) {
               return miniml::err(_(Fun), "GetFunction - undefined function");
             }
 
-            ctx->registers[tmpIdent] = theFunction;
+            (*ctx)->registers[tmpIdent] = theFunction;
 
             return NoChange;
           },
@@ -583,7 +585,7 @@ namespace llvmir {
             [ctx](Match& _) -> Node {
             std::vector<llvm::Type*> fieldTypes;
             for (Node irType : *_(TypeList)) {
-              llvm::Type* llvmType = createLLVMType(ctx, irType);
+              llvm::Type* llvmType = createLLVMType(*ctx, irType);
               if (!llvmType) {
                 return miniml::err(
                   irType, "CreateStructType - invalid field type");
@@ -594,13 +596,13 @@ namespace llvmir {
 
             std::string resultId = node_val(_(Result));
             llvm::StructType* theStructType =
-              llvm::StructType::create(ctx->llvm_context, resultId);
+              llvm::StructType::create((*ctx)->llvm_context, resultId);
             theStructType->setBody(fieldTypes, false);
             if (!theStructType) {
               return miniml::err(_(Result), "CreateStructType - failed to create struct type");
             }
 
-            ctx->types[resultId] = theStructType;
+            (*ctx)->types[resultId] = theStructType;
 
             return NoChange;
           },
@@ -612,7 +614,7 @@ namespace llvmir {
                     T(TypeList)[ParamList]) >>
             [ctx](Match& _) -> Node {
             Node returnType = _(IRType);
-            llvm::Type* returnLLVMType = createLLVMType(ctx, returnType);
+            llvm::Type* returnLLVMType = createLLVMType(*ctx, returnType);
             if (!returnLLVMType) {
               return miniml::err(
                 returnType, "CreateFunType - invalid return type");
@@ -620,7 +622,7 @@ namespace llvmir {
 
             std::vector<llvm::Type*> paramTypes;
             for (Node paramTy : *_(ParamList)) {
-              llvm::Type* llvmType = createLLVMType(ctx, paramTy);
+              llvm::Type* llvmType = createLLVMType(*ctx, paramTy);
               if (!llvmType) {
                 return miniml::err(
                   paramTy, "CreateFunType - invalid parameter type");
@@ -642,7 +644,7 @@ namespace llvmir {
           }
 
             std::string resultId = node_val(_(Result));
-            ctx->types[resultId] = theFunctionType;
+            (*ctx)->types[resultId] = theFunctionType;
 
             return NoChange;
           },
@@ -659,9 +661,9 @@ namespace llvmir {
             Value* value;
             try {
               value = (_(Type) == Ti1) ?
-                ctx->builder.getInt1(std::stoi(valueStr)) :
-                (_(Type) == Ti32) ? ctx->builder.getInt32(std::stoi(valueStr)) :
-                (_(Type) == Ti64) ? ctx->builder.getInt64(std::stoi(valueStr)) :
+                (*ctx)->builder.getInt1(std::stoi(valueStr)) :
+                (_(Type) == Ti32) ? (*ctx)->builder.getInt32(std::stoi(valueStr)) :
+                (_(Type) == Ti64) ? (*ctx)->builder.getInt64(std::stoi(valueStr)) :
                                     nullptr;
             } catch (const std::invalid_argument& ia) {
               return miniml::err(
@@ -675,7 +677,7 @@ namespace llvmir {
               return miniml::err(_(Type), "CreateConst - unexpected type");
             }
 
-            ctx->registers[regId] = value;
+            (*ctx)->registers[regId] = value;
 
             return NoChange;
           },
@@ -690,25 +692,25 @@ namespace llvmir {
 
             std::string resultId = node_val(result);
             std::string typeId = node_val(typeToFindSizeOf);
-            llvm::Type* type = ctx->types[typeId];
+            llvm::Type* type = (*ctx)->types[typeId];
             if (!type || !type->isSized()) {
               return miniml::err(
                 typeToFindSizeOf, "GetSizeOfType - invalid type");
             }
 
-            auto dl = llvm::DataLayout(ctx->llvm_module.getDataLayout());
+            auto dl = llvm::DataLayout((*ctx)->llvm_module.getDataLayout());
             auto typeSize = dl.getTypeStoreSize(type);
 
             llvm::Value* value = desiredType == Ti32 ?
-              ctx->builder.getInt32(typeSize) :
-              desiredType == Ti64 ? ctx->builder.getInt64(typeSize) :
+              (*ctx)->builder.getInt32(typeSize) :
+              desiredType == Ti64 ? (*ctx)->builder.getInt64(typeSize) :
                                     nullptr;
             if (!value) {
               return miniml::err(
                 desiredType, "GetSizeOfType - unexpected desired type");
             }
 
-            ctx->registers[resultId] = value;
+            (*ctx)->registers[resultId] = value;
 
             return NoChange;
           },
@@ -716,34 +718,34 @@ namespace llvmir {
           // Create Basic Block
           In(Body) * T(Block)[Block] >> [ctx](Match& _) -> Node {
             std::string funName = node_val(_(Block)->parent(IRFun));
-            Function* function = ctx->llvm_module.getFunction(funName);
+            Function* function = (*ctx)->llvm_module.getFunction(funName);
             if (!function) {
               return miniml::err(_(Block), "CreateBasicBlock - undefined function");
             }
 
             std::string blockId = node_val(_(Block));
             BasicBlock* block =
-              BasicBlock::Create(ctx->llvm_context, blockId, function);
+              BasicBlock::Create((*ctx)->llvm_context, blockId, function);
 
-            ctx->basicBlocks[blockId] = block;
+            (*ctx)->basicBlocks[blockId] = block;
 
             return NoChange;
           },
 
         }};
 
-    pass.pre([ctx](Node) {
-      ctx->reset();
-      genExternalFunctions(ctx);
-      genRuntimeFunctions(ctx);
+    pass.pre([ctx, in_file, out_file](Node) {
+      *ctx = std::make_shared<LLVMIRContext>(*in_file, *out_file);
+      genExternalFunctions(*ctx);
+      genRuntimeFunctions(*ctx);
 
       return 0;
     });
 
     pass.pre(IRFun, [ctx](Node functionToken) {
-      ctx->registers.clear();
+      (*ctx)->registers.clear();
       std::string funId = node_val(functionToken);
-      llvm::Function* function = ctx->llvm_module.getFunction(funId);
+      llvm::Function* function = (*ctx)->llvm_module.getFunction(funId);
       if (verifyFunction(*function)) {
         functionToken << miniml::err(
             functionToken->clone(), "Function verification failed.");
@@ -755,7 +757,7 @@ namespace llvmir {
       for (Node param : *paramList) {
         std::string paramName = node_val(param / Ident);
         arg->setName(paramName);
-        ctx->registers[paramName] = arg;
+        (*ctx)->registers[paramName] = arg;
         arg++;
       }
 
@@ -764,7 +766,7 @@ namespace llvmir {
 
     pass.post(IRFun, [ctx](Node functionToken) {
       std::string fun_name = node_val(functionToken);
-      Function* fun = ctx->llvm_module.getFunction(fun_name);
+      Function* fun = (*ctx)->llvm_module.getFunction(fun_name);
       if(verifyFunction(*fun)) {
         functionToken << miniml::err(
             functionToken->clone(), "Function verification failed.");
@@ -775,26 +777,26 @@ namespace llvmir {
     });
 
     pass.post([ctx](Node top) {
-      Function* main = ctx->llvm_module.getFunction("main");
+      Function* main = (*ctx)->llvm_module.getFunction("main");
       if (!main) {
         top << miniml::err(
           top->clone(), "Program does not have a 'main' function.");
         return 1;
       }
       verifyFunction(*main, &llvm::errs());
-      verifyModule(ctx->llvm_module, &llvm::errs());
+      verifyModule((*ctx)->llvm_module, &llvm::errs());
 
       std::string outfile;
-      if (!ctx->output_file.empty()) {
+      if (!(*ctx)->output_file.empty()) {
         std::filesystem::path filepath =
-          std::filesystem::absolute(ctx->output_file);
+          std::filesystem::absolute((*ctx)->output_file);
         outfile = filepath.replace_extension(".ll").string();
       } else {
         outfile = "./out.ll";
       }
       std::error_code errorCode;
       llvm::raw_fd_ostream outLLVMIR(outfile, errorCode);
-      ctx->llvm_module.print(outLLVMIR, nullptr);
+      (*ctx)->llvm_module.print(outLLVMIR, nullptr);
 
       return 0;
     });

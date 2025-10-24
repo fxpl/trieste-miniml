@@ -41,16 +41,6 @@ namespace llvmir {
     // Trieste's output file, if any.
     std::string output_file;
 
-    void reset() {
-      basicBlocks.clear();
-      types.clear();
-      registers.clear();
-
-      llvm_module.getFunctionList().clear();
-
-      llvm_module = llvm::Module(llvm_module.getSourceFileName(), llvm_context);
-    }
-
     LLVMIRContext(std::string input_filepath, std::string output_filepath)
     : builder(llvm_context),
       llvm_module(input_filepath, llvm_context),

@@ -21,6 +21,9 @@ namespace miniml {
           [](Match& _) -> Node {
           Node freeVarList = _(FreeVarList);
 
+          // std::cout << "Processing closure free variables for globals."
+          //           << std::endl;
+
           for (size_t i = 0, n = freeVarList->size(); i < n; i++) {
             Node freeVar = freeVarList->at(i);
             Node ident = freeVar / Ident;

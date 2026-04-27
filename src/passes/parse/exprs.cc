@@ -14,16 +14,7 @@ PassDef wrap_exprs(){
               / (--Start * T(Ident,Int,True,False,Fun,If)[Ident])) >>
           [](Match& _){
             return Expr << _(Ident);
-      },
-      --(In(FunDef,Param,Let,Expr)) * T(Ident)[Ident] >> //identifier expressions
-        [](Match& _){
-          return Expr << _(Ident);
-      },
-      --(In(Expr)) * ((T(Int,True,False,Fun,If,Print)[Expr] * --End)
-                   / (--Start * T(Int,True,False,Fun,If,Print)[Expr])) >>
-        [](Match& _){
-          return Expr << _(Expr);
-        }
+      }
       }
     };
   }

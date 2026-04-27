@@ -8,7 +8,7 @@ namespace miniml {
 
   Reader reader(std::string input_filepath, std::string output_filepath) {
     return {
-      "miniML",
+      "miniml",
       passes(input_filepath, output_filepath),
       parser(),
     };

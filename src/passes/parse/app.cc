@@ -19,13 +19,7 @@ using namespace trieste;
               {return Expr << (App
                         << _(Lhs)
                         << _(Rhs));
-            },  
-        // Error rules
-        T(App)[App] << --(T(Expr) * T(Expr)) >>
-          [](Match &_)
-          {
-            return err(_(App), "invalid expression");
-          },
+            }
         }};
   }
 }

@@ -49,7 +49,7 @@ namespace miniml{
     ;
 
     inline const auto wf_exp_tokens_fun = init_parse::wf_parse_tokens
-        - (wf_types | Is | Let | Colon | Term);
+        - (wf_types | Is | Colon | Term);
 
     inline const auto wf_group_tokens = (init_parse::wf_parse_tokens | Expr)
         - (wf_types | Colon | Is | Fun);
@@ -67,7 +67,7 @@ namespace miniml{
 
     inline const auto wf_exp_tokens_par = (wf_exp_tokens_fun | Expr) - Paren;
 
-    inline const auto wf_group_tokens_par = (wf_group_tokens | Let) - Paren;
+    inline const auto wf_group_tokens_par = wf_group_tokens - Paren;
 
     inline const auto wf_parens =
     wf_fun
@@ -85,16 +85,19 @@ namespace miniml{
     | (Group <<= wf_group_tokens_cond++[1])
     ;
 
+    inline const auto wf_exp_tokens_let =
+      wf_exp_tokens_cond - Let;
+
     inline const auto wf_let =
-      wf_conditionals
+      (wf_conditionals - Group)
     | (Program <<= TopExpr++)
     | (TopExpr <<= (Let | Expr))
     | (Let <<= Ident * Expr)
+    | (Expr <<= wf_exp_tokens_let++[1])
     ;
 
     inline const auto wf_exp_tokens_app =
-      wf_exp_tokens_cond | App;
-
+      wf_exp_tokens_let | App;
     inline const auto wf_funapp =
       wf_let
     | (Expr <<= wf_exp_tokens_app++[1])

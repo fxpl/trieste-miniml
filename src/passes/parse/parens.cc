@@ -7,7 +7,6 @@ namespace miniml {
 
 using namespace trieste;
 
-  inline const auto exprs = expr_binOp / expr_const / expr_keywords / T(Fun,Ident,Print,Expr);
 
   PassDef parens(){
       return {
@@ -22,11 +21,7 @@ using namespace trieste;
       T(Paren)[Paren] >>
         [](Match& _){
           return err(_(Paren), "invalid parenthesis");
-        },
-      In(Expr)[Expr] * !(exprs) >>
-        [](Match& _){
-          return err(_(Expr), "invalid expression");
-      }
+        }
       }
     };
   }

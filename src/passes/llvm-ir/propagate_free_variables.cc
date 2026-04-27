@@ -20,10 +20,12 @@ namespace miniml {
         // Find free variables and their function definition.
         In(FreeVarList) * T(FreeVar)[FreeVar] >> [](Match& _) -> Node {
           Node freeVar = _(FreeVar);
+          //std::cout << "Propagating free variable: \n" << freeVar->str() << std::endl;
           Node ident = freeVar / Ident;
           std::string name = node_val(ident);
 
           Node enclosingFun = ident->scope()->scope();
+          //std::cout << "In enclosing fun \n" << enclosingFun->str() << std::endl;
           if (enclosingFun != Fun) {
             return NoChange;
           }
@@ -33,7 +35,11 @@ namespace miniml {
           }
 
           Node enclosingFreeVars = enclosingFun / FunDef / FreeVarList;
+          //std::cout << "Enclosing free vars: \n"
+            //        << enclosingFreeVars->str() << std::endl;
           for (Node enclosedFreeVar : *enclosingFreeVars) {
+            /*std::cout << "Checking against enclosed free var \n"
+                      << enclosedFreeVar->str() << std::endl; */
             std::string enclosedName = node_val(enclosedFreeVar / Ident);
             if (name == enclosedName) {
               return NoChange;

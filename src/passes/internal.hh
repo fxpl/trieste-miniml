@@ -126,12 +126,12 @@ namespace miniml{
     (Top <<= Program)
     | (Program <<= TopExpr++)
     | (TopExpr <<= (Let | Expr))
-    | (Let <<= Ident * Expr)
+    | (Let <<= Ident * Expr)[Ident]
     | (Expr <<= wf_expr)
     | (If <<= Expr * Expr * Expr)
     | (Fun <<= FunDef)
     | (FunDef <<= Ident * Annotation * Param * Expr)[Ident]
-    | (Param <<= Ident * Annotation)
+    | (Param <<= Ident * Annotation)[Ident]
     | (App <<= (Lhs >>= Expr) * (Rhs >>= Expr))
     | (Mul <<= (Lhs >>= Expr) * (Rhs >>= Expr))
     | (Add <<= (Lhs >>= Expr) * (Rhs >>= Expr))

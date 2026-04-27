@@ -117,11 +117,15 @@ namespace miniml {
   }
 
   bool in_type(std::string var, Node ty) {
+    if (ty->type() == TVar && node_val(ty) == var)
+      return true;
+
     for (auto child : *ty) {
       if (child->type() == TVar && node_val(child) == var)
         return true;
       else if (child->type() == TypeArrow) {
-        in_type(var, child);
+        if (in_type(var, child))
+          return true;
       }
     }
     return false;

@@ -13,7 +13,7 @@ inline const auto empty_expr = T(Expr) << End;
     return {
       "conditionals",
       parse::wf_conditionals,
-      dir::bottomup,
+      (dir::bottomup | dir::once),
       {(T(If) << (T(Group))[Cond]) * (T(Then) << (T(Group))[Then]) *
            (T(Else) << (T(Group))[Else]) >>
          [](Match& _) -> Node {
@@ -45,6 +45,8 @@ inline const auto empty_expr = T(Expr) << End;
          [](Match& _) -> Node { return err(_(Then), "unexpected 'then'"); },
 
        T(Else)[Else] >>
-         [](Match& _) -> Node { return err(_(Else), "unexpected 'else'"); }}};
+         [](Match& _) -> Node { return err(_(Else), "unexpected 'else'"); }
+      }
+    };
   }
 }

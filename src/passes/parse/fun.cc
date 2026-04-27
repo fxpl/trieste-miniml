@@ -79,7 +79,7 @@ PassDef fun() {
             _(Colon), ": can only appear in functions to annotate types");
         },
 
-      T(Is, Fun)[Fun] >> [](Match& _) { return err(_(Fun), "parse error"); },
+      In(Group) * T(Is, Fun)[Fun] >> [](Match& _) { return err(_(Fun), "parse error"); },
     }};
   }
 

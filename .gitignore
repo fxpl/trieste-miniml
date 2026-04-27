@@ -34,7 +34,7 @@
 # Build files
 build 
 out 
-
+generated
 
 # Vscode
 .vscode/

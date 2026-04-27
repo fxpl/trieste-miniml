@@ -8,7 +8,7 @@ FetchContent_Declare(
   trieste
   SOURCE_DIR ../../Trieste # Local trieste path while waiting on PR merge
   #GIT_REPOSITORY https://github.com/microsoft/Trieste 
-  GIT_TAG main
+  GIT_TAG feature(fuzz_samples)
   )  
 
 FetchContent_MakeAvailable(trieste)
@@ -41,7 +41,7 @@ target_link_libraries(miniml
   ${llvm_libs}
 )
 
-option(CODE_COVERAGE "Enable coverage reporting" ON)
+option(CODE_COVERAGE "Enable coverage reporting" OFF)
 
 if(CODE_COVERAGE)
    message(STATUS "Code coverage enabled")

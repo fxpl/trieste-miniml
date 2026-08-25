@@ -1,9 +1,9 @@
-let id = fun f x is x;;   
+let id = fun f x is x;;
 
-let idtrue = id true ;;  
+print(id true) ;;
 
-let id0 = id 0 ;;  
+print(id 0) ;;
 
-let idfalse = id false ;;
+print(id false) ;;
 
-id 1 ;; 
+print(id 1) ;;

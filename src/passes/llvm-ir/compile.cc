@@ -3,14 +3,61 @@
 #include "../internal.hh"
 #include "../utils.hh"
 #include "trieste/token.h"
+#include <unordered_map>
 
 namespace miniml {
 
   using namespace trieste;
 
   struct CompileContext {
+    // Maps the name of each top-level `let`-bound identifier to its true
+    // declared type, i.e. the type before instantiation. For a
+    // polymorphic binding this still contains bare TVars. A call site only
+    // carries the locally-instantiated (concrete) type of a `Global`
+    // reference, which can hide that the callee's physical signature still
+    // expects a boxed (Ti64) value at that position - this map is how that
+    // is recovered. Populated once, up front, in the program-entry rule.
+    std::unordered_map<std::string, Node> globalTypes;
+
     ~CompileContext() {}
   };
+
+  // Finds every top-level `let` binding (the only place `Let` nodes occur -
+  // MiniML has no local/expression-level `let`) and records its declared
+  // type, stripped of the outer `ForAllTy` scheme so a polymorphic
+  // binding's type reads e.g. as `TVar -> TVar` rather than
+  // `forall a. a -> a`.
+  void collect_global_types(
+    Node n, std::unordered_map<std::string, Node>& out) {
+    for (auto child : *n) {
+      if (child->type() == Let) {
+        Node ident = child / Ident;
+        out[node_val(ident)] = get_type(child / Type);
+      } else {
+        collect_global_types(child, out);
+      }
+    }
+  }
+
+  // Converts a value from its natural LLVM representation into the
+  // uniform boxed word (Ti64) used wherever a polymorphic function's
+  // declared signature says TVar.
+  Node box_value(Node srcId, Node dstId, Node srcType) {
+    Node op = (srcType == llvmir::TPtr) ? llvmir::PtrToInt : llvmir::ZExt;
+    return (llvmir::Instr
+            << (llvmir::ConversionOp
+                << (op << dstId << srcId << llvmir::Ti64)));
+  }
+
+  // Converts a boxed word (Ti64) back into a value's natural LLVM
+  // representation, at a call site that statically knows the concrete
+  // type a polymorphic result was instantiated to.
+  Node unbox_value(Node srcId, Node dstId, Node dstType) {
+    Node op = (dstType == llvmir::TPtr) ? llvmir::IntToPtr : llvmir::Trunc;
+    return (llvmir::Instr
+            << (llvmir::ConversionOp
+                << (op << dstId << srcId << dstType->clone())));
+  }
 
   /**
    * @brief
@@ -36,7 +83,9 @@ namespace miniml {
         /**
          * Add compile node and assign tmp/register.
          */
-        In(Top) * Start * T(IRProgram)[Program] * End >> [](Match& _) -> Node {
+        In(Top) * Start * T(IRProgram)[Program] * End >>
+          [context](Match& _) -> Node {
+          collect_global_types(_(Program), context->globalTypes);
           auto children = *_[Program];
           return (Compile << (llvmir::Program << children));
         },
@@ -94,19 +143,6 @@ namespace miniml {
                          << (llvmir::MemoryOp
                              << (llvmir::Store << _(Result)->clone()
                                                << irIdent->clone())));
-        },
-
-        /**
-         * Unresolved polymorphic type.
-         *
-         * resolve_polymorphism should have already rejected every TVar
-         * before compile runs, but nothing in this pass's own well-formedness
-         * precondition rules it out (wf_types still includes TVar).
-         */
-        T(Compile) << T(llvmir::Ident) *
-              (T(Expr) << (T(Type) << T(TVar)[TVar])) >>
-          [](Match& _) -> Node {
-          return err(_(TVar), "Cannot compile polymorphic types");
         },
 
         /**
@@ -332,7 +368,7 @@ namespace miniml {
          */
         T(Compile) << T(llvmir::Ident)[Result] *
               (T(Expr) << (T(Type)) * T(ClosureCall)[ClosureCall]) >>
-          [](Match& _) -> Node {
+          [context](Match& _) -> Node {
           Node closCall = _(ClosureCall);
           Node fun = closCall / Fun;
           Node param = closCall / Param;
@@ -340,11 +376,37 @@ namespace miniml {
           if (typeArrow != TypeArrow) {
             return err(typeArrow, "closure call type is not a function type");
           }
+          // The type the caller sees for this specific call (after HM
+          // instantiation), used to know each value's natural/unboxed type.
           Node funArgType = typeArrow / Ty1;
           Node funRetType = typeArrow / Ty2;
 
-          Node argLLVMType = getLLVMType(funArgType);
-          Node retLLVMType = getLLVMType(funRetType);
+          // The callee's true declared type, which may still be a bare
+          // TVar - that's masked by instantiation above whenever the
+          // callee is a polymorphic `let`-bound global. A local
+          // Param/FunDef-bound closure is never generalized, so
+          // `typeArrow` is already its true declared type in that case.
+          // NOTE: this only looks through a direct Global reference; a
+          // partially-applied polymorphic closure flowing through an
+          // intermediate, non-Global expression is not resolved (not
+          // required for the currently supported polymorphism forms).
+          Node declaredArrow = typeArrow;
+          Node calleeExpr = fun / Expr;
+          if (calleeExpr == Global) {
+            auto it = context->globalTypes.find(node_val(calleeExpr));
+            if (it != context->globalTypes.end() && it->second == TypeArrow) {
+              declaredArrow = it->second;
+            }
+          }
+          Node declaredArgType = declaredArrow / Ty1;
+          Node declaredRetType = declaredArrow / Ty2;
+
+          // The callee's actual physical LLVM signature.
+          Node argLLVMType = getLLVMType(declaredArgType);
+          Node retLLVMType = getLLVMType(declaredRetType);
+
+          bool boxArg = declaredArgType == TVar && funArgType != TVar;
+          bool unboxRet = declaredRetType == TVar && funRetType != TVar;
 
           std::string uniqueId = std::string(fun->fresh().view());
           Node closurePtr = llvmir::Ident ^ "closPtr_" + uniqueId;
@@ -392,25 +454,52 @@ namespace miniml {
                  << funTy
                  << retLLVMType
                  << (llvmir::TypeList << llvmir::TPtr << llvmir::TPtr << argLLVMType)));
+
+          // If the callee's declared parameter is boxed but this call site
+          // has a concrete argument, convert it to the boxed word first.
+          Node callArgId = argId;
+          Node boxedArgId = nullptr;
+          if (boxArg) {
+            boxedArgId = llvmir::Ident ^ param->fresh();
+            callArgId = boxedArgId;
+          }
+
+          // If the callee's declared return is boxed but this call site's
+          // result is expected to be concrete, call into a raw temporary
+          // and unbox it into `_(Result)`.
+          Node callResultId = _(Result);
+          if (unboxRet) {
+            callResultId = llvmir::Ident ^ fun->fresh();
+          }
+
           Node callFun =
             (llvmir::Instr
              << (llvmir::MiscOp
                  << (llvmir::CallOpaque
-                     << _(Result) << funTy->clone() << funPtr->clone()
+                     << callResultId << funTy->clone() << funPtr->clone()
                      << (llvmir::ArgList
                          << closurePtr->clone()
                          << envPtr->clone()
-                         << argId->clone()))));
+                         << callArgId->clone()))));
 
-          return Seq
+          Node result = Seq
             << (Compile << closurePtr << fun)
             << GEPEnvSlotInClosure
             << loadEnvPtr
             << GEPFunSlotInClosure
             << loadFunPtr
-            << (Compile << argId << param)
-            << createFunType
-            << callFun;
+            << (Compile << argId << param);
+          if (boxArg) {
+            result
+              << box_value(argId->clone(), boxedArgId, getLLVMType(funArgType));
+          }
+          result << createFunType << callFun;
+          if (unboxRet) {
+            result
+              << unbox_value(
+                   callResultId->clone(), _(Result), getLLVMType(funRetType));
+          }
+          return result;
           // clang-format on
         },
 

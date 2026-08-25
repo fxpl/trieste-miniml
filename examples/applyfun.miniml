@@ -1,3 +1,4 @@
-let apply = fun app f is fun appf x is f x;;
+let apply = fun app f is
+            fun g x is f x;;
 
-apply (fun f x is x + 1) 42;;
+print(apply (fun f x is x + 1) 42);;

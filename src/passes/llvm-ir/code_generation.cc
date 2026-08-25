@@ -498,6 +498,106 @@ namespace llvmir {
             return NoChange;
           },
 
+          // ZExt (widen an integer, e.g. boxing Ti32/Ti1 into Ti64)
+          T(Instr)
+              << (T(ConversionOp)
+                  << (T(ZExt) << T(Ident)[Result] * T(Ident)[IRValue] *
+                        T(Ti1, Ti32, Ti64, TPtr)[IRType])) >>
+            [ctx](Match& _) -> Node {
+            llvm::Type* targetType = createLLVMType(ctx, _(IRType));
+            if (!targetType) {
+              return miniml::err(_(IRType), "ZExt - invalid target type");
+            }
+
+            std::string valueToConvertId = node_val(_(IRValue));
+            Value* valueToConvert = ctx->registers[valueToConvertId];
+            if (!valueToConvert) {
+              return miniml::err(_(IRValue), "ZExt - undefined value to convert");
+            }
+
+            std::string resultId = node_val(_(Result));
+            Value* result =
+              ctx->builder.CreateZExt(valueToConvert, targetType, resultId);
+            ctx->registers[resultId] = result;
+
+            return NoChange;
+          },
+
+          // Trunc (narrow an integer, e.g. unboxing Ti64 into Ti32/Ti1)
+          T(Instr)
+              << (T(ConversionOp)
+                  << (T(Trunc) << T(Ident)[Result] * T(Ident)[IRValue] *
+                        T(Ti1, Ti32, Ti64, TPtr)[IRType])) >>
+            [ctx](Match& _) -> Node {
+            llvm::Type* targetType = createLLVMType(ctx, _(IRType));
+            if (!targetType) {
+              return miniml::err(_(IRType), "Trunc - invalid target type");
+            }
+
+            std::string valueToConvertId = node_val(_(IRValue));
+            Value* valueToConvert = ctx->registers[valueToConvertId];
+            if (!valueToConvert) {
+              return miniml::err(_(IRValue), "Trunc - undefined value to convert");
+            }
+
+            std::string resultId = node_val(_(Result));
+            Value* result =
+              ctx->builder.CreateTrunc(valueToConvert, targetType, resultId);
+            ctx->registers[resultId] = result;
+
+            return NoChange;
+          },
+
+          // PtrToInt (boxing a closure/TPtr into Ti64)
+          T(Instr)
+              << (T(ConversionOp)
+                  << (T(PtrToInt) << T(Ident)[Result] * T(Ident)[IRValue] *
+                        T(Ti1, Ti32, Ti64, TPtr)[IRType])) >>
+            [ctx](Match& _) -> Node {
+            llvm::Type* targetType = createLLVMType(ctx, _(IRType));
+            if (!targetType) {
+              return miniml::err(_(IRType), "PtrToInt - invalid target type");
+            }
+
+            std::string valueToConvertId = node_val(_(IRValue));
+            Value* valueToConvert = ctx->registers[valueToConvertId];
+            if (!valueToConvert) {
+              return miniml::err(_(IRValue), "PtrToInt - undefined value to convert");
+            }
+
+            std::string resultId = node_val(_(Result));
+            Value* result =
+              ctx->builder.CreatePtrToInt(valueToConvert, targetType, resultId);
+            ctx->registers[resultId] = result;
+
+            return NoChange;
+          },
+
+          // IntToPtr (unboxing Ti64 back into a closure/TPtr)
+          T(Instr)
+              << (T(ConversionOp)
+                  << (T(IntToPtr) << T(Ident)[Result] * T(Ident)[IRValue] *
+                        T(Ti1, Ti32, Ti64, TPtr)[IRType])) >>
+            [ctx](Match& _) -> Node {
+            llvm::Type* targetType = createLLVMType(ctx, _(IRType));
+            if (!targetType) {
+              return miniml::err(_(IRType), "IntToPtr - invalid target type");
+            }
+
+            std::string valueToConvertId = node_val(_(IRValue));
+            Value* valueToConvert = ctx->registers[valueToConvertId];
+            if (!valueToConvert) {
+              return miniml::err(_(IRValue), "IntToPtr - undefined value to convert");
+            }
+
+            std::string resultId = node_val(_(Result));
+            Value* result =
+              ctx->builder.CreateIntToPtr(valueToConvert, targetType, resultId);
+            ctx->registers[resultId] = result;
+
+            return NoChange;
+          },
+
           /**
            * Function Declaration
            */

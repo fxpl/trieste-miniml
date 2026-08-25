@@ -16,8 +16,6 @@
 #include "typecheck/solve_constraints.cc"
 #include "typecheck/resolve_print.cc"
 
-#include "llvm-ir/resolve_polymorphism.cc"
-
 #include "llvm-ir/free_variables.cc"
 #include "llvm-ir/propagate_free_variables.cc"
 #include "llvm-ir/globals.cc"
@@ -60,9 +58,6 @@ namespace miniml {
       solve_constraints(),
       cleanup_constraints(),
       resolve_print(),
-
-      // TODO: Polymorphism not supported
-      resolve_polymorphism(),
 
       // Generate IR
       free_variables(),

@@ -79,6 +79,13 @@ namespace llvmir {
   // ConversionOps
   inline const auto ConversionOp = TokenDef("conversion_op_llvm");
   inline const auto BitCast = TokenDef("bitcast_llvm");
+  // Used to convert between a value's natural LLVM representation and the
+  // uniform boxed word (Ti64) used for values flowing through polymorphic
+  // (TVar-typed) positions.
+  inline const auto ZExt = TokenDef("zext_llvm");
+  inline const auto Trunc = TokenDef("trunc_llvm");
+  inline const auto PtrToInt = TokenDef("ptrtoint_llvm");
+  inline const auto IntToPtr = TokenDef("inttoptr_llvm");
 
   // LLVM IR API actions (not LLVM IR instructions)
   inline const auto Action = TokenDef("action_llvm");
@@ -161,8 +168,12 @@ namespace llvmir {
       | (Phi <<= (Result >>= Ident) * (Type >>= wf_llvm_types) * PredecessorList)
         | (PredecessorList <<= Predecessor++)
           | (Predecessor <<= (IRValue >>= Ident) * Label)
-    | (ConversionOp <<= (BitCast))
+    | (ConversionOp <<= (BitCast | ZExt | Trunc | PtrToInt | IntToPtr))
       | (BitCast <<= (Result >>= Ident) * (IRValue >>= Ident) * (IRType >>= (Ident | wf_llvm_types)))
+      | (ZExt <<= (Result >>= Ident) * (IRValue >>= Ident) * (IRType >>= wf_llvm_types))
+      | (Trunc <<= (Result >>= Ident) * (IRValue >>= Ident) * (IRType >>= wf_llvm_types))
+      | (PtrToInt <<= (Result >>= Ident) * (IRValue >>= Ident) * (IRType >>= wf_llvm_types))
+      | (IntToPtr <<= (Result >>= Ident) * (IRValue >>= Ident) * (IRType >>= wf_llvm_types))
     | (TerminatorOp <<= (Branch | Jump | Ret))
       | (Branch <<= (Cond >>= Ident) * (True >>= Label) * (False >>= Label))
       | (Jump <<= (Label))

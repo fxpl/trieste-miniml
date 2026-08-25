@@ -233,6 +233,12 @@ namespace miniml {
       return llvmir::TPtr;
     } else if (type == TPtr) {
       return llvmir::TPtr;
+    } else if (type == TVar) {
+      // Polymorphic (TVar-typed) values are never inspected, so they can
+      // all share one uniform physical representation: a single machine
+      // word wide enough to hold any concrete type (Ti32/Ti1 zext'd in,
+      // TPtr ptrtoint'd in). See the boxing logic in compile.cc.
+      return llvmir::Ti64;
     } else {
       return err(type, "no equivalent LLVM IR type");
     }

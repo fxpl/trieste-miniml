@@ -8,7 +8,11 @@ FetchContent_Declare(
   trieste
   GIT_REPOSITORY https://github.com/microsoft/Trieste
   GIT_TAG ff2acc317bda025210b1400d20e19a41f8349da5
-  )  
+  )
+set(TRIESTE_BUILD_SAMPLES OFF)
+set(TRIESTE_BUILD_PARSERS OFF)
+set(TRIESTE_BUILD_PARSER_TESTS OFF)
+set(TRIESTE_BUILD_PARSER_TOOLS OFF)
 
 FetchContent_MakeAvailable(trieste)
 
@@ -40,7 +44,7 @@ target_link_libraries(miniml
   ${llvm_libs}
 )
 
-option(CODE_COVERAGE "Enable coverage reporting" OFF)
+option(CODE_COVERAGE "Enable coverage reporting" ON)
 
 if(CODE_COVERAGE)
    message(STATUS "Code coverage enabled")

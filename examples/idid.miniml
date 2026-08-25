@@ -2,3 +2,4 @@ let id = fun f x is x ;;
 
 let idid = id id ;;
 
+print(idid 42)

@@ -146,7 +146,7 @@ namespace miniml{
 
     namespace check{
 
-    inline const auto wf_fresh = parse::wf
+    inline const auto wf_fresh = parse::wf - Annotation
     | (TopExpr <<= Constraints * (Expr >>= (Let | Expr)))
     | (Constraints <<= EqConstr++)
     | (EqConstr <<= (Ty1 >>= wf_types) * (Ty2 >>= wf_types))
@@ -173,10 +173,10 @@ namespace miniml{
     // Final Wf
     inline const auto wf =
     parse::wf
-    | (Type <<= (Type >>= wf_types | ForAllTy))
+    | (Type <<= (Type >>= wf_types))
     | (ForAllTy <<= TVars * Type)
     | (TVars <<= TVar++)
-    | (Let <<= Ident * Type * Expr)[Ident]
+    | (Let <<= Ident * (Type >>= ForAllTy) * Expr)[Ident] // Only let bindings can be polymorphic
     | (Expr <<= Type * (Expr >>= wf_expr))
     | (Param <<= Ident * Type)[Ident]
     | (FunDef <<= Ident * Type * Param * Expr)[Ident]
@@ -197,7 +197,7 @@ namespace miniml{
       inline const auto wf_functions =
         wf_freeVars
         | (Top <<= IRProgram)
-        | (IRProgram <<= IRFun++)
+        | (IRProgram <<= IRFun++[1]) // Added this since no rules in the closures pass to ensure that it fulfills the ++1 there 
         | (IRFun <<= Type * ParamList * Env * FreeVarList * Body)
         | (ParamList <<= Param++)
         | (Body <<= TopExpr++)
@@ -209,11 +209,13 @@ namespace miniml{
         | (Env <<= Type++)
         | (Body <<= (TopExpr | Expr)++)
         | (TopExpr <<= (Let | Expr))
-        | (Expr <<= Type * (Expr >>= ((wf_expr - App) | Global | CreateClosure | ClosureCall | FunCall)))
+        | (Let <<= Ident * (Type >>= ForAllTy) * Expr) //Drop binding 
+        | (Expr <<= Type * 
+            (Expr >>= ((wf_expr - App - Fun) | Global | CreateClosure | ClosureCall | FunCall)))
           | (CreateClosure <<= (Fun >>= Ident) * Env * FreeVarList)
           | (FunCall <<= (Fun >>= Expr) * (Param >>= Expr))
           | (ClosureCall <<= (Fun >>= Expr) * (Param >>= Expr))
-        | (Type <<= (Type >>= wf_types | ForAllTy | TPtr))
+        | (Type <<= (Type >>= wf_types | TPtr))
         ;
 
       inline const auto wf =

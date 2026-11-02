@@ -75,7 +75,7 @@ namespace miniml {
   // Separators
   inline const auto Colon = TokenDef(":");
   inline const auto Term = TokenDef(";;");
-  inline const auto Paren = TokenDef("()");
+  inline const auto Paren = TokenDef("paren");
 
   // Convenience tokens
   inline const auto Name = TokenDef("name", flag::print);

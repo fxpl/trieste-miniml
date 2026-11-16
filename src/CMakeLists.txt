@@ -6,9 +6,8 @@ include(FetchContent)
 
 FetchContent_Declare(
   trieste
-  SOURCE_DIR ../../Trieste # Local trieste path while waiting on PR merge
-  #GIT_REPOSITORY https://github.com/microsoft/Trieste 
-  GIT_TAG feature(fuzz_samples)
+  GIT_REPOSITORY https://github.com/microsoft/Trieste
+  GIT_TAG ff2acc317bda025210b1400d20e19a41f8349da5
   )  
 
 FetchContent_MakeAvailable(trieste)

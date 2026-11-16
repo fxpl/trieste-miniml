@@ -21,7 +21,7 @@ namespace miniml {
   PassDef free_variables() {
     auto ctx = std::make_shared<Context>();
 
-    return {
+    PassDef pass = {
       "free_variables",
       closures::wf_freeVars,
       (dir::bottomup | dir::once),
@@ -97,5 +97,13 @@ namespace miniml {
           return _(Program);
         },
       }};
+
+    pass.pre([ctx](Node) {
+      ctx->freeVars.clear();
+      ctx->freeVarNames.clear();
+      return 0;
+    });
+
+    return pass;
   }
 }

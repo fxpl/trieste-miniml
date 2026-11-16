@@ -37,7 +37,8 @@ namespace miniml {
          * Add compile node and assign tmp/register.
          */
         In(Top) * Start * T(IRProgram)[Program] * End >> [](Match& _) -> Node {
-          return (Compile << (llvmir::Program << *_(Program)));
+          auto children = *_[Program];
+          return (Compile << (llvmir::Program << children));
         },
 
         /**
@@ -93,6 +94,19 @@ namespace miniml {
                          << (llvmir::MemoryOp
                              << (llvmir::Store << _(Result)->clone()
                                                << irIdent->clone())));
+        },
+
+        /**
+         * Unresolved polymorphic type.
+         *
+         * resolve_polymorphism should have already rejected every TVar
+         * before compile runs, but nothing in this pass's own well-formedness
+         * precondition rules it out (wf_types still includes TVar).
+         */
+        T(Compile) << T(llvmir::Ident) *
+              (T(Expr) << (T(Type) << T(TVar)[TVar])) >>
+          [](Match& _) -> Node {
+          return err(_(TVar), "Cannot compile polymorphic types");
         },
 
         /**
@@ -175,6 +189,9 @@ namespace miniml {
                   : err(binop, "malformed binary operator");
 
           Node llvmType = getLLVMType(_(Type) / Type);
+          if (llvmType != llvmir::Ti32) {
+            return err(_(Type), "arithmetic on non-int type");
+          }
 
           Node lhsId = llvmir::Ident ^ lhs->fresh();
           Node rhsId = llvmir::Ident ^ rhs->fresh();
@@ -204,7 +221,7 @@ namespace miniml {
 
           Node type = get_type(lhs);
           Node llvmType = getLLVMType(type);
-          if (llvmType == nullptr) {
+          if (llvmType != llvmir::Ti1 && llvmType != llvmir::Ti32) {
             return err(lhs / Type, "comparison type not supported");
           }
 
@@ -475,6 +492,15 @@ namespace miniml {
             if (paramList->size() < 2) {
               return err(paramList, "too few parameters to function");
             }
+            // A function body is a single (possibly let-nested) expression:
+            // unlike main's body, it isn't a sequence of top-level
+            // statements, so exactly one child is expected here.
+            // Not prevented by WF since Body is shared with main functions,
+            // that allow multiple expressions.
+            if (body->size() != 1) {
+              return err(
+                body, "function body must contain exactly one expression");
+            }
             Node envPtr = llvmir::Ident ^ node_val((paramList->at(1) / Ident));
             Node loadFreeVarsFromEnv =
               (Compile << envType->clone() << envPtr->clone() << freeVarList
@@ -500,9 +526,6 @@ namespace miniml {
          */
         T(Compile) << T(Env)[Env] >> [](Match& _) -> Node {
           Node env = _(Env);
-          if (env->size() == 0) {
-            return {};
-          }
 
           for (size_t i = 0, n = env->size(); i < n; i++) {
             Node type = env->at(i);
@@ -801,6 +824,10 @@ namespace miniml {
           auto children = *_(PropagateCompile);
 
           return Seq << children;
+        },
+
+        T(Compile) << T(llvmir::Ident) * T(Expr)[Expr] >> [](Match& _) -> Node {
+          return err(_(Expr), "Cannot compile ill-typed expression");
         },
       }};
   }

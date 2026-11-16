@@ -1,0 +1,10 @@
+let add = 
+  fun f (x : int) is
+      fun h (z : int) : int is x + z;;
+
+let apply1 = fun h (f : int -> int -> int) : int -> int is f 1 ;;
+
+let increment = apply1 add ;;
+
+(* Prints 10 (increment 9) *)
+print(increment 9);;

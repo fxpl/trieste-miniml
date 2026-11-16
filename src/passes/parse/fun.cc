@@ -10,6 +10,7 @@ using namespace trieste;
 inline const auto ungrouped_type = (type * type++);
 inline const auto parenthesized_type = T(Paren) << ((T(Group) << ungrouped_type) / ungrouped_type);
 inline const auto type_ann = ungrouped_type / parenthesized_type;
+inline const auto prim_type = T(TInt, TBool, TVar);
 
 PassDef fun() {
   return {
@@ -48,9 +49,14 @@ PassDef fun() {
               << (type[Type] / (T(Group) << ungrouped_type[Type]))) >>
         [](Match& _) -> Node { return Annotation << _[Type]; },
 
-      // parse arrow types
-      In(Annotation) * type[Lhs] * T(TypeArrow)[TypeArrow] * type++[Rhs] >>
-        [](Match& _) { return _(TypeArrow) << _(Lhs) << _(Rhs); },
+      // parse arrow types (e.g. int -> int)
+      In(Annotation) * prim_type[Lhs] * T(TypeArrow)[TypeArrow] *
+          (type * type++)[Rhs] >>
+        [](Match& _) { return _(TypeArrow) << _(Lhs) << _[Rhs]; },
+
+      In(TypeArrow)[TypeArrow] * prim_type[Lhs] * T(TypeArrow)[TypeArrow] *
+          (type * type++)[Rhs] >>
+        [](Match& _) { return _(TypeArrow) << _(Lhs) << _[Rhs]; },
 
       // parse print primitive
       --In(Expr) * T(Print)[Print] >>
@@ -79,7 +85,8 @@ PassDef fun() {
             _(Colon), ": can only appear in functions to annotate types");
         },
 
-      In(Group) * T(Is, Fun)[Fun] >> [](Match& _) { return err(_(Fun), "parse error"); },
+      In(Group) * T(Is, Fun)[Fun] >>
+        [](Match& _) { return err(_(Fun), "parse error"); },
     }};
   }
 

@@ -46,6 +46,10 @@ namespace llvmir {
       types.clear();
       registers.clear();
 
+      // The builder's insert point refers to a block in the module that is
+      // about to be destroyed, so it must not survive the reset.
+      builder.ClearInsertionPoint();
+
       llvm_module.getFunctionList().clear();
 
       llvm_module = llvm::Module(llvm_module.getSourceFileName(), llvm_context);
@@ -58,6 +62,12 @@ namespace llvmir {
 
     ~LLVMIRContext() {}
   };
+
+  // The LLVM verifier reports the reason on the first line, followed by the
+  // offending IR, which is too verbose for an error message.
+  static std::string firstLine(const std::string& text) {
+    return text.substr(0, text.find('\n'));
+  }
 
   /**
    * Creates a LLVM IR type from a miniML type token.

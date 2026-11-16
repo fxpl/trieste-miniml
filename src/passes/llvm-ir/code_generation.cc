@@ -174,8 +174,15 @@ namespace llvmir {
               Node offsetType = offsetNode / IRType;
               Value* offset = nullptr;
               if (offsetType == Ti32) {
-                int offsetValue = stoi(valStr);
-                offset = ctx->builder.getInt32(offsetValue);
+                try {
+                  offset = ctx->builder.getInt32(std::stoi(valStr));
+                } catch (const std::invalid_argument& ia) {
+                  return miniml::err(
+                    offsetNode / IRValue, "GEP - invalid offset value");
+                } catch (const std::out_of_range& oor) {
+                  return miniml::err(
+                    offsetNode / IRValue, "GEP - offset value out of range");
+                }
               }
               if (!offset) {
                 return miniml::err(offsetNode, "GEP - unexpected offset type");
@@ -205,7 +212,7 @@ namespace llvmir {
             Function* function = ctx->llvm_module.getFunction(funId);
 
             if (function == nullptr) {
-              function = (Function*)ctx->registers[funId];
+              function = dyn_cast_or_null<Function>(ctx->registers[funId]);
             }
             if (!function) {
               return miniml::err(_(Fun), "Call - undefined function");
@@ -239,7 +246,7 @@ namespace llvmir {
             [ctx](Match& _) -> Node {
             std::string funTyId = node_val(_(IRType));
             llvm::FunctionType* funTy =
-              (llvm::FunctionType*)ctx->types[funTyId];
+              dyn_cast_or_null<llvm::FunctionType>(ctx->types[funTyId]);
             if (!funTy) {
               return miniml::err(
                 _(IRType), "CallOpaque - invalid function type");
@@ -334,6 +341,9 @@ namespace llvmir {
             if (!trueVal) {
               return miniml::err(_(True), "Phi - undefined true value");
             }
+            if (trueVal->getType() != type) {
+              return miniml::err(_(True), "Phi - true value has wrong type");
+            }
 
             std::string trueLabel = node_val(_(True) / Label);
             BasicBlock* trueBlock = ctx->basicBlocks[trueLabel];
@@ -345,6 +355,9 @@ namespace llvmir {
             Value* falseVal = ctx->registers[falseId];
             if (!falseVal) {
               return miniml::err(_(False), "Phi - undefined false value");
+            }
+            if (falseVal->getType() != type) {
+              return miniml::err(_(False), "Phi - false value has wrong type");
             }
 
             std::string falseLabel = node_val(_(False) / Label);
@@ -365,14 +378,8 @@ namespace llvmir {
 
           // Label
           In(Block) * T(Label)[Label] >> [ctx](Match& _) -> Node {
-            std::string funId = node_val(_(Label)->parent(IRFun));
             std::string blockId = node_val(_(Label));
-
             llvm::BasicBlock* block = ctx->basicBlocks[blockId];
-            if (!block) {
-              return miniml::err(_(Label), "Label - undefined block");
-            }
-
             ctx->builder.SetInsertPoint(block);
 
             return NoChange;
@@ -530,6 +537,12 @@ namespace llvmir {
             }
 
             std::string theFunctionName = node_val(_(Fun));
+            // LLVM would silently rename a duplicate (e.g. 'main.1'), making
+            // later lookups by name find the wrong function.
+            if (ctx->llvm_module.getFunction(theFunctionName)) {
+              return miniml::err(
+                _(Fun), "FunctionDecl - function already defined");
+            }
             Function* theFunction = Function::Create(
               theFunctionType,
               Function::LinkageTypes::ExternalLinkage,
@@ -639,7 +652,7 @@ namespace llvmir {
             }
             if (!theFunctionType) {
               return miniml::err(_(Result), "CreateFunType - invalid function type");
-          }
+            }
 
             std::string resultId = node_val(_(Result));
             ctx->types[resultId] = theFunctionType;
@@ -714,7 +727,20 @@ namespace llvmir {
           },
 
           // Create Basic Block
-          In(Body) * T(Block)[Block] >> [ctx](Match& _) -> Node {
+          In(Body) * (T(Block)[Block] << T(Label)[Label]) >>
+            [ctx](Match& _) -> Node {
+            // Blocks are registered under their own name, but the Label rule
+            // and branches look them up by label, which can be a source of
+            // error when fuzzing. A block whose name differs from its label
+            // could never be entered, so its statements would have no block to
+            // be emitted into. Rejecting the whole block here means they are
+            // never visited.
+            if (node_val(_(Block)) != node_val(_(Label))) {
+              return miniml::err(
+                _(Block),
+                "CreateBasicBlock - block name does not match its label");
+            }
+
             std::string funName = node_val(_(Block)->parent(IRFun));
             Function* function = ctx->llvm_module.getFunction(funName);
             if (!function) {
@@ -722,6 +748,12 @@ namespace llvmir {
             }
 
             std::string blockId = node_val(_(Block));
+            // Labels are fresh names, so a duplicate would overwrite the
+            // earlier block and make its Label resolve to the wrong one.
+            if (ctx->basicBlocks[blockId]) {
+              return miniml::err(
+                _(Block), "CreateBasicBlock - block already defined");
+            }
             BasicBlock* block =
               BasicBlock::Create(ctx->llvm_context, blockId, function);
 
@@ -736,6 +768,9 @@ namespace llvmir {
       ctx->reset();
       genExternalFunctions(ctx);
       genRuntimeFunctions(ctx);
+      // Generating the runtime functions leaves the builder inside one of
+      // them; instructions must only be emitted after a Label sets the block.
+      ctx->builder.ClearInsertionPoint();
 
       return 0;
     });
@@ -765,9 +800,12 @@ namespace llvmir {
     pass.post(IRFun, [ctx](Node functionToken) {
       std::string fun_name = node_val(functionToken);
       Function* fun = ctx->llvm_module.getFunction(fun_name);
-      if(verifyFunction(*fun)) {
+      std::string reason;
+      llvm::raw_string_ostream reasonStream(reason);
+      if (verifyFunction(*fun, &reasonStream)) {
         functionToken << miniml::err(
-            functionToken->clone(), "Function verification failed.");
+          functionToken->clone(),
+          "Function verification failed: " + firstLine(reason));
         return 1;
       }
 
@@ -781,8 +819,15 @@ namespace llvmir {
           top->clone(), "Program does not have a 'main' function.");
         return 1;
       }
-      verifyFunction(*main, &llvm::errs());
-      verifyModule(ctx->llvm_module, &llvm::errs());
+      // Problems spanning functions (e.g. a branch to a block in another
+      // function) are only caught when verifying the whole module.
+      std::string reason;
+      llvm::raw_string_ostream reasonStream(reason);
+      if (verifyModule(ctx->llvm_module, &reasonStream)) {
+        top << miniml::err(
+          top->clone(), "Module verification failed: " + firstLine(reason));
+        return 1;
+      }
 
       std::string outfile;
       if (!ctx->output_file.empty()) {

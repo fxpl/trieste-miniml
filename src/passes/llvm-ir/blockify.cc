@@ -26,6 +26,10 @@ namespace miniml {
           Node statements = nullptr;
           for (Node child : *_(Body)) {
             if (child == llvmir::Label) {
+              // Starting a new block would silently drop the open one.
+              if (block) {
+                return err(child, "Label inside unterminated block");
+              }
               block = llvmir::Block ^ node_val(child);
               block->push_back(child);
               statements = llvmir::Statements;
@@ -41,6 +45,12 @@ namespace miniml {
             } else {
               return err(child, "Instruction or terminator outside of block");
             }
+          }
+
+          // A block is only added once its terminator is seen, so a block
+          // still open here would be dropped (possibly leaving Body empty).
+          if (block) {
+            return err(block->front(), "Block without terminator");
           }
 
           return blockifiedBody;

@@ -76,11 +76,7 @@ namespace miniml {
           Node let = _(Let);
           Node ident = let / Ident;
           Node expr = let / Expr;
-
-          if (get_type(let) != ForAllTy) {
-            return err(let, "let declaration is not polymorphic");
-          }
-          Node type = get_type(get_type(let));
+          Node type = get_type(let / Type);
 
           Node llvmType = getLLVMType(type);
           if (llvmType == nullptr) {

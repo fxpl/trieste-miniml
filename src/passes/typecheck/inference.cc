@@ -105,8 +105,13 @@ namespace miniml
                     if (bound_node->type() == Let)
                     { // if let bound ident, create "instance of" constraint
                       auto fresh = fresh_tvar();
-                      auto inst_constr = inst_constraint(fresh, type/Type, _(Ident));
-                      return Seq << lift_constraint(inst_constr)
+                      auto let_type = type / Type;
+                      // If the type is not a TVar (might happen if we start
+                      // from this pass), use an equality constraint instead.
+                      auto constr = (let_type == TVar) ?
+                        inst_constraint(fresh, let_type, _(Ident)) :
+                        eq_constraint(fresh, let_type, _(Ident));
+                      return Seq << lift_constraint(constr)
                                  << (Expr << (Type << fresh) << _(Ident));
                     }
                     else

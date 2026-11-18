@@ -15,7 +15,7 @@ namespace miniml {
            << (T(Let) 
              * T(Ident)[Ident] 
              * T(Equals) 
-             * (T(Expr)[Expr] / (Any * Any++)[Rhs])) >>
+             * ((T(Expr)[Expr] * End) / (Any * Any++)[Rhs])) >>
          [](Match& _) {
            return TopExpr
                   << (Let << _(Ident) 

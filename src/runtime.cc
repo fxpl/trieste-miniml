@@ -10,10 +10,10 @@ namespace llvmir {
   void genPrintBool(std::shared_ptr<LLVMIRContext> context);
 
   void genExternalFunctions(std::shared_ptr<LLVMIRContext> ctx) {
-    // printf(char*) -> i32
+    // printf(ptr, ...) -> i32
     FunctionType* printfFunctionType = FunctionType::get(
       ctx->builder.getInt32Ty(),
-      {ctx->builder.getInt8Ty()->getPointerTo()},
+      {ctx->builder.getPtrTy()},
       true);
     ctx->llvm_module.getOrInsertFunction("printf", printfFunctionType);
 
@@ -43,7 +43,7 @@ namespace llvmir {
    */
   void genPrintInt(std::shared_ptr<LLVMIRContext> context) {
     // Formatstring needed to make calls to printf
-    auto formatStrInt = context->builder.CreateGlobalStringPtr(
+    auto formatStrInt = context->builder.CreateGlobalString(
       "%d\n", "formatStrInt", 0, &context->llvm_module);
 
     // printInt(i32) -> i32
@@ -80,9 +80,9 @@ namespace llvmir {
    */
   void genPrintBool(std::shared_ptr<LLVMIRContext> context) {
     // String needed to make calls to printf
-    auto strBoolTrue = context->builder.CreateGlobalStringPtr(
+    auto strBoolTrue = context->builder.CreateGlobalString(
       "true\n", "strBoolTrue", 0, &context->llvm_module);
-    auto strBoolFalse = context->builder.CreateGlobalStringPtr(
+    auto strBoolFalse = context->builder.CreateGlobalString(
       "false\n", "strBoolFalse", 0, &context->llvm_module);
 
     // printInt(i1) -> i1

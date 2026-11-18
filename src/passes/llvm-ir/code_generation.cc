@@ -127,7 +127,7 @@ namespace llvmir {
           // Load
           T(Instr)
               << (T(MemoryOp)
-                  << (T(Load) << T(Ident)[Ident] * T(Ti32, Ti1, TPtr)[Type] *
+                  << (T(Load) << T(Ident)[Ident] * T(Ti1, Ti32, Ti64, TPtr)[Type] *
                         T(Ident)[Src])) >>
             [ctx](Match& _) -> Node {
             std::string resultId = node_val(_(Ident));
@@ -322,16 +322,12 @@ namespace llvmir {
           // Phi
           T(Instr)
               << (T(MiscOp)
-                  << (T(Phi) << T(Ident)[Ident] * T(Ti32, Ti1)[Type] *
+                  << (T(Phi) << T(Ident)[Ident] * T(Ti1, Ti32, Ti64, TPtr)[Type] *
                         (T(PredecessorList)
                          << T(Predecessor)[True] * T(Predecessor)[False]))) >>
             [ctx](Match& _) -> Node {
-            llvm::Type* type = NULL;
-            if (_(Type) == Ti32) {
-              type = ctx->builder.getInt32Ty();
-            } else if (_(Type) == Ti1) {
-              type = ctx->builder.getInt1Ty();
-            }
+            // i64 = polymorphic values, ptr = closures
+            llvm::Type* type = createLLVMType(ctx, _(Type));
             if (!type) {
               return miniml::err(_(Type), "Phi - invalid type");
             }

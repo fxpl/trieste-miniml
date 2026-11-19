@@ -16,6 +16,7 @@
 #include "typecheck/solve_constraints.cc"
 #include "typecheck/resolve_print.cc"
 
+#include "llvm-ir/unique_globals.cc"
 #include "llvm-ir/free_variables.cc"
 #include "llvm-ir/propagate_free_variables.cc"
 #include "llvm-ir/globals.cc"
@@ -60,6 +61,7 @@ namespace miniml {
       resolve_print(),
 
       // Generate IR
+      unique_globals(),
       free_variables(),
       propagate_free_variables(),
       globals(),

@@ -257,7 +257,14 @@ namespace miniml {
 
           Node type = get_type(lhs);
           Node llvmType = getLLVMType(type);
-          if (llvmType != llvmir::Ti1 && llvmType != llvmir::Ti32) {
+          // The type checker only allows `=` on types that admit equality
+          // (int, bool and equality type variables) and `<` on int.
+          // Polymorphic values are compared as boxed words, which is exact
+          // since boxing an int or a bool is injective (see box_value).
+          bool supported = (comparison == Equals)
+            ? llvmType->type().in({llvmir::Ti1, llvmir::Ti32, llvmir::Ti64})
+            : llvmType == llvmir::Ti32;
+          if (!supported) {
             return err(lhs / Type, "comparison type not supported");
           }
 

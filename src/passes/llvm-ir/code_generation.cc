@@ -284,7 +284,7 @@ namespace llvmir {
           T(Instr)
               << (T(MiscOp)
                   << (T(Icmp) << T(Ident)[Ident] * T(EQ, ULT, SLT)[Op] *
-                        T(Ti32, Ti1)[Type] * T(Ident)[Lhs] * T(Ident)[Rhs])) >>
+                        T(Ti1, Ti32, Ti64)[Type] * T(Ident)[Lhs] * T(Ident)[Rhs])) >>
             [ctx](Match& _) -> Node {
             std::string lhsId = node_val(_(Lhs));
             Value* lhs = ctx->registers[lhsId];

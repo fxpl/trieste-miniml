@@ -33,6 +33,27 @@ namespace miniml {
     return TVar ^ "#a" + std::to_string(counter);
   }
 
+  Node fresh_eq_tvar() {
+    counter++;
+    return TVar ^ "#e" + std::to_string(counter);
+  }
+
+  bool is_eq_tvar(Node ty) {
+    return ty->type() == TVar && node_val(ty).starts_with("#e");
+  }
+
+  bool admits_equality(Node ty) {
+    if (ty->type() == TypeArrow) {
+      return false;
+    }
+    for (auto& child : *ty) {
+      if (!admits_equality(child)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   Node tvars() {
     return (TVars ^ "tvars");
   }
@@ -213,7 +234,8 @@ namespace miniml {
       Node ftvars = ty / TVars;
       // initialize concrete type variables
       for (auto child : *ftvars) {
-        auto freshtv = fresh_tvar();
+        // an equality type variable is instantiated with an equality one
+        auto freshtv = is_eq_tvar(child) ? fresh_eq_tvar() : fresh_tvar();
         substmap[node_val(child)] = freshtv;
       }
       // substitute fresh variables in type

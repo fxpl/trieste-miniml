@@ -164,7 +164,7 @@ namespace llvmir {
       | (Call <<= ((Result >>= Ident) * (Fun >>= Ident) * ArgList))
       | (CallOpaque <<= ((Result >>= Ident) * (IRType >>= Ident) * (Fun >>= Ident) * ArgList))
         | (ArgList <<= (Ident)++)
-      | (Icmp <<= (Result >>= Ident) * (Op >>= wf_comparison) * (Type >>= (Ti1 | Ti32)) * (Lhs >>= Ident) * (Rhs >>= Ident))
+      | (Icmp <<= (Result >>= Ident) * (Op >>= wf_comparison) * (Type >>= (Ti1 | Ti32 | Ti64)) * (Lhs >>= Ident) * (Rhs >>= Ident))
       | (Phi <<= (Result >>= Ident) * (Type >>= wf_llvm_types) * PredecessorList)
         | (PredecessorList <<= Predecessor++)
           | (Predecessor <<= (IRValue >>= Ident) * Label)

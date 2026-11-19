@@ -23,6 +23,23 @@ namespace miniml {
 
   Node fresh_tvar();
 
+  /**
+   * Equality type variables (SML's ''a) range only over types that admit
+   * equality, i.e. types without function types. They are ordinary TVars
+   * whose name starts with "#e" (ordinary type variables start with "#a");
+   * user programs cannot write type variables.
+   */
+  Node fresh_eq_tvar();
+
+  bool is_eq_tvar(Node ty);
+
+  /**
+   * Whether a type admits equality, i.e. contains no function type. (A type
+   * variable inside a type that admits equality is a type variable at the
+   * top; it is handled by unifying it with the equality type variable.)
+   */
+  bool admits_equality(Node ty);
+
   Node tvars();
 
   Node bool_type();

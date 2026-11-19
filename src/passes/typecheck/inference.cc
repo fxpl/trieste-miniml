@@ -146,10 +146,13 @@ namespace miniml
                   auto r_typ = _(Rhs) / Type;
                   auto op_eqconstraint = eq_constraint(l_typ, r_typ, _(Expr));
                   auto expr = (Expr << (Type << optyp) << _(Op));
-                  return (_(Op)->type() == Equals)
-                    ? Seq << (lift_constraint(op_eqconstraint)) << expr
-                    : Seq << (lift_constraints({op_eqconstraint, eq_constraint(r_typ, int_type(), _(Expr))}))
-                          << expr;
+                  // `=` is only defined on types that admit equality (SML's
+                  // ''a * ''a -> bool), all other operators only on int
+                  auto operand_constraint = (_(Op)->type() == Equals)
+                    ? eq_constraint(r_typ, fresh_eq_tvar(), _(Expr))
+                    : eq_constraint(r_typ, int_type(), _(Expr));
+                  return Seq << (lift_constraints({op_eqconstraint, operand_constraint}))
+                             << expr;
                 },
             // Function definition
             T(Expr) << (T(Fun)[Fun]

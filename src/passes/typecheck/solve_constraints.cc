@@ -41,8 +41,18 @@ namespace miniml
           },
 
         T(SubstEqConstr) << (T(TVar)[Ty1] * T(TVar)[Ty2]) >>
-          [](Match& _) -> Node {
-          return node_val(_(Ty1)) == node_val(_(Ty2)) ? nothing : NoChange;
+          [local_subst](Match& _) -> Node {
+          if (node_val(_(Ty1)) == node_val(_(Ty2))) {
+            return nothing;
+          }
+          // Unifying an ordinary type variable with an equality type
+          // variable makes it an equality type variable, so bind the
+          // ordinary one (the general rule below would bind Ty1).
+          if (is_eq_tvar(_(Ty1)) && !is_eq_tvar(_(Ty2))) {
+            update_substmap(local_subst, _(Ty2), _(Ty1));
+            return nothing;
+          }
+          return NoChange;
         },
 
         T(SubstEqConstr)[EqConstr]
@@ -51,6 +61,9 @@ namespace miniml
             if(in_type(node_val(_(TVar)), _(Type))) {
               // TODO: More information in type error
               return err(_(EqConstr), "Cannot construct infinite type");
+            }
+            if (is_eq_tvar(_(TVar)) && !admits_equality(_(Type))) {
+              return err(_(EqConstr), "Equality type required");
             }
             update_substmap(local_subst, _(TVar), _(Type));
             return nothing;
